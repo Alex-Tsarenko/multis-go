@@ -1,0 +1,380 @@
+openapi: 3.0.3
+info:
+  title: Multis.Agent API
+  description: Локальный Go-агент с REST API и Server-Sent Events для потоковой передачи данных
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер
+
+paths:
+  /session:
+    post:
+      summary: Создать новую сессию
+      description: Инициализирует новую сессию диалога с агентом
+      operationId: createSession
+      tags:
+        - Session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  description: Идентификатор модели (например, deepseek-chat, deepseek-reasoner)
+                  example: deepseek-chat
+                max_steps:
+                  type: integer
+                  description: Максимальное количество шагов в цикле ReAct
+                  default: 50
+                  example: 50
+                workspace:
+                  type: string
+                  description: Рабочая директория агента
+                  example: /home/user/project
+              required:
+                - model
+      responses:
+        '201':
+          description: Сессия создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /session/{sessionId}:
+    get:
+      summary: Получить информацию о сессии
+      description: Возвращает статус и метаданные сессии
+      operationId: getSession
+      tags:
+        - Session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор сессии
+      responses:
+        '200':
+          description: Информация о сессии
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Сессия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить сессию
+      description: Завершает и удаляет сессию
+      operationId: deleteSession
+      tags:
+        - Session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор сессии
+      responses:
+        '204':
+          description: Сессия удалена
+        '404':
+          description: Сессия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /session/{sessionId}/message:
+    post:
+      summary: Отправить сообщение в сессию
+      description: Отправляет пользовательский ввод и возвращает поток ответов через SSE
+      operationId: sendMessage
+      tags:
+        - Messages
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор сессии
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  description: Текст сообщения пользователя
+                  example: Какой файл содержит главную функцию?
+              required:
+                - content
+      responses:
+        '200':
+          description: Поток ответов через SSE
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events поток
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Сессия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /session/{sessionId}/stream:
+    get:
+      summary: SSE поток сессии
+      description: Подключается к потоку событий сессии в реальном времени
+      operationId: streamSession
+      tags:
+        - Stream
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор сессии
+      responses:
+        '200':
+          description: SSE поток событий
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                reasoning:
+                  summary: Событие рассуждения
+                  value: |
+                    event: reasoning
+                    data: {"content": "Анализирую структуру проекта..."}
+                message:
+                  summary: Событие сообщения
+                  value: |
+                    event: message
+                    data: {"content": "Главная функция находится в main.go"}
+                tool_call:
+                  summary: Событие вызова инструмента
+                  value: |
+                    event: tool_call
+                    data: {"id": "call_123", "name": "read_file", "arguments": {"path": "main.go"}}
+                tool_result:
+                  summary: Событие результата инструмента
+                  value: |
+                    event: tool_result
+                    data: {"status": "success", "output": "package main\n\nfunc main() {...}"}
+                error:
+                  summary: Событие ошибки
+                  value: |
+                    event: error
+                    data: {"message": "File not found: main.go"}
+                done:
+                  summary: Событие завершения
+                  value: |
+                    event: done
+                    data: {"finish_reason": "stop"}
+        '404':
+          description: Сессия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /session/{sessionId}/stop:
+    post:
+      summary: Остановить выполнение
+      description: Прерывает текущее выполнение агента в сессии
+      operationId: stopSession
+      tags:
+        - Control
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор сессии
+      responses:
+        '200':
+          description: Выполнение остановлено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: stopped
+        '404':
+          description: Сессия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор сессии
+          example: "sess_abc123"
+        model:
+          type: string
+          description: Идентификатор модели
+          example: deepseek-chat
+        max_steps:
+          type: integer
+          description: Максимальное количество шагов
+          example: 10
+        workspace:
+          type: string
+          description: Рабочая директория
+          example: /home/user/project
+        status:
+          type: string
+          enum: [idle, running, stopped, error]
+          description: Статус сессии
+          example: idle
+        created_at:
+          type: string
+          format: date-time
+          description: Время создания сессии
+          example: "2026-11-03T15:30:00Z"
+      required:
+        - id
+        - model
+        - status
+        - created_at
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Код ошибки
+          example: invalid_request
+        message:
+          type: string
+          description: Описание ошибки
+          example: Missing required field: content
+      required:
+        - error
+        - message
+
+    ReasoningEvent:
+      type: object
+      description: Событие рассуждения reasoning-модели
+      properties:
+        content:
+          type: string
+          description: Чанк цепочки рассуждений
+          example: "Анализирую структуру проекта..."
+      required:
+        - content
+
+    MessageEvent:
+      type: object
+      description: Событие основного текста ответа
+      properties:
+        content:
+          type: string
+          description: Чанк текста ответа
+          example: "Главная функция находится в main.go"
+      required:
+        - content
+
+    ToolCallEvent:
+      type: object
+      description: Событие вызова инструмента
+      properties:
+        id:
+          type: string
+          description: Идентификатор вызова
+          example: "call_123"
+        name:
+          type: string
+          description: Имя инструмента
+          example: "read_file"
+        arguments:
+          type: object
+          description: Аргументы инструмента
+          additionalProperties: true
+          example:
+            path: "main.go"
+      required:
+        - id
+        - name
+        - arguments
+
+    ToolResultEvent:
+      type: object
+      description: Событие результата работы инструмента
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+          description: Статус выполнения
+          example: success
+        output:
+          type: string
+          description: Усечённый вывод инструмента
+          example: "package main\n\nfunc main() {...}"
+      required:
+        - status
+        - output
+
+    ErrorEvent:
+      type: object
+      description: Событие ошибки
+      properties:
+        message:
+          type: string
+          description: Описание ошибки
+          example: "File not found: main.go"
+      required:
+        - message
+
+    DoneEvent:
+      type: object
+      description: Маркер завершения шага
+      properties:
+        finish_reason:
+          type: string
+          enum: [stop, max_steps, loop_detected, error]
+          description: Причина завершения
+          example: stop
+      required:
+        - finish_reason
