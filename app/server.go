@@ -31,6 +31,13 @@ func (s *Server) RegisterRoutes(handler *Handler) {
 	s.mux.HandleFunc("POST /session/{id}/message", handler.SendMessage)
 	s.mux.HandleFunc("GET /session/{id}/stream", handler.StreamSession)
 	s.mux.HandleFunc("POST /session/{id}/stop", handler.StopSession)
+
+	// Новые эндпоинты
+	s.mux.HandleFunc("GET /prompts/history", handler.GetPromptHistory)
+	s.mux.HandleFunc("DELETE /prompts/history", handler.ClearPromptHistory)
+	s.mux.HandleFunc("GET /settings", handler.GetSettings)
+	s.mux.HandleFunc("PUT /settings", handler.UpdateSettings)
+	s.mux.HandleFunc("POST /models/unload", handler.UnloadModel)
 }
 
 // RegisterStatic регистрирует статические файлы

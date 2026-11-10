@@ -20,6 +20,11 @@
                     <option value="qwen3.5:4b">qwen3.5:4b</option>
                 </datalist>
                 <input type="text" id="workspace" placeholder="Workspace" value="." />
+                <select id="securityMode" title="Security Mode">
+                    <option value="default">Security: default</option>
+                    <option value="ask">Security: ask</option>
+                    <option value="auto">Security: auto</option>
+                </select>
                 <button id="createSession">New Session</button>
             </div>
         </header>
@@ -27,7 +32,8 @@
         <main>
             <div id="chat" class="chat"></div>
             <div class="input-area">
-                <textarea id="message" placeholder="Enter your message..."></textarea>
+                <input list="history-list" id="message" placeholder="Enter your message... (use arrow down for history)" autocomplete="off" />
+                <datalist id="history-list"></datalist>
                 <button id="send">Send</button>
                 <button id="stop" disabled>Stop</button>
             </div>

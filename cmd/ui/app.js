@@ -10,6 +10,8 @@ const stopBtn = document.getElementById('stop');
 const createSessionBtn = document.getElementById('createSession');
 const modelSelect = document.getElementById('model');
 const workspaceInput = document.getElementById('workspace');
+const securityModeSelect = document.getElementById('securityMode');
+const historyList = document.getElementById('history-list');
 
 document.getElementById('createSession').addEventListener('click', createSession);
 document.getElementById('send').addEventListener('click', sendMessage);
@@ -21,15 +23,88 @@ document.getElementById('message').addEventListener('keydown', (e) => {
     }
 });
 
+// Загрузка настроек и истории промптов при старте
+initApp();
+
+async function initApp() {
+    await loadSettings();
+    await loadPromptHistory();
+}
+
+async function loadSettings() {
+    try {
+        const res = await fetch('/settings');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.last_model) {
+                modelSelect.value = data.last_model;
+            }
+            if (data.security_mode && securityModeSelect) {
+                securityModeSelect.value = data.security_mode;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load settings:', e);
+    }
+}
+
+async function saveSettings(lastModel, securityMode) {
+    try {
+        const payload = {};
+        if (lastModel !== undefined) payload.last_model = lastModel;
+        if (securityMode !== undefined) payload.security_mode = securityMode;
+
+        await fetch('/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch (e) {
+        console.error('Failed to save settings:', e);
+    }
+}
+
+async function loadPromptHistory() {
+    try {
+        const res = await fetch('/prompts/history?limit=30');
+        if (res.ok) {
+            const items = await res.json();
+            if (historyList) {
+                historyList.innerHTML = '';
+                const seen = new Set();
+                items.forEach((item) => {
+                    if (!seen.has(item.prompt)) {
+                        seen.add(item.prompt);
+                        const opt = document.createElement('option');
+                        opt.value = item.prompt;
+                        historyList.appendChild(opt);
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load prompt history:', e);
+    }
+}
+
 async function createSession() {
     const model = modelSelect.value;
     const workspace = workspaceInput.value;
+    const securityMode = securityModeSelect ? securityModeSelect.value : 'default';
+
+    // Сохраняем выбранную модель и режим
+    saveSettings(model, securityMode);
 
     try {
         const response = await fetch('/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, max_steps: 10, workspace })
+            body: JSON.stringify({
+                model,
+                max_steps: 10,
+                workspace,
+                security_mode: securityMode
+            })
         });
 
         if (!response.ok) {
@@ -39,7 +114,7 @@ async function createSession() {
         const session = await response.json();
         currentSessionId = session.id;
         chatEl.innerHTML = '';
-        appendMessage('system', `Session created: ${session.id}`);
+        appendMessage('system', `Session created: ${session.id} (security: ${session.security_mode || securityMode})`);
         connectStream();
         updateStatus('Session ready');
     } catch (error) {
@@ -75,6 +150,9 @@ async function sendMessage() {
         if (!response.ok) {
             throw new Error('Failed to send message');
         }
+
+        // Обновляем список истории
+        loadPromptHistory();
     } catch (error) {
         appendMessage('error', error.message);
         isRunning = false;
@@ -134,6 +212,7 @@ function connectStream() {
         isRunning = false;
         sendBtn.disabled = false;
         stopBtn.disabled = true;
+        currentMessageEl = null;
         updateStatus('Done: ' + data.finish_reason);
     });
 
@@ -142,14 +221,19 @@ function connectStream() {
     };
 }
 
-function appendMessage(role, content, append = false) {
-    let messageEl = document.getElementById(`msg-${role}`);
+let currentMessageEl = null;
 
-    if (append && messageEl) {
-        messageEl.textContent += content;
+function appendMessage(role, content, append = false) {
+    if (role === 'assistant') {
+        if (!currentMessageEl || !append) {
+            currentMessageEl = document.createElement('div');
+            currentMessageEl.className = 'message assistant';
+            chatEl.appendChild(currentMessageEl);
+        }
+        currentMessageEl.textContent += content;
     } else {
-        messageEl = document.createElement('div');
-        messageEl.id = `msg-${role}`;
+        currentMessageEl = null;
+        const messageEl = document.createElement('div');
         messageEl.className = `message ${role}`;
         messageEl.textContent = content;
         chatEl.appendChild(messageEl);

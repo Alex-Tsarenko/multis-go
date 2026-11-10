@@ -36,6 +36,12 @@ paths:
                   type: string
                   description: Рабочая директория агента
                   example: /home/user/project
+                security_mode:
+                  type: string
+                  description: Режим безопасности агента
+                  enum: [default, ask, auto]
+                  default: default
+                  example: default
               required:
                 - model
       responses:
@@ -242,6 +248,129 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /prompts/history:
+    get:
+      summary: Получить историю промптов
+      description: Возвращает список ранее отправленных пользователем промптов
+      operationId: getPromptHistory
+      tags:
+        - Prompts
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Максимальное количество записей
+      responses:
+        '200':
+          description: Список промптов из истории
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromptHistoryItem'
+
+    delete:
+      summary: Очистить историю промптов
+      description: Удаляет сохраненную историю промптов
+      operationId: clearPromptHistory
+      tags:
+        - Prompts
+      responses:
+        '204':
+          description: История промптов очищена
+
+  /settings:
+    get:
+      summary: Получить настройки приложения
+      description: Возвращает сохраненные настройки приложения, включая последнюю выбранную модель и режим безопасности
+      operationId: getSettings
+      tags:
+        - Settings
+      responses:
+        '200':
+          description: Настройки приложения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppSettings'
+
+    put:
+      summary: Обновить настройки приложения
+      description: Обновляет настройки приложения (последняя модель, режим безопасности)
+      operationId: updateSettings
+      tags:
+        - Settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAppSettingsRequest'
+      responses:
+        '200':
+          description: Настройки успешно обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppSettings'
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /models/unload:
+    post:
+      summary: Выгрузить модель Ollama из памяти
+      description: Останавливает и выгружает указанную модель Ollama из GPU/RAM
+      operationId: unloadModel
+      tags:
+        - Models
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  description: Имя выгружаемой модели Ollama
+                  example: qwen3.5:4b
+              required:
+                - model
+      responses:
+        '200':
+          description: Модель успешно выгружена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unloaded
+                  model:
+                    type: string
+                    example: qwen3.5:4b
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Ошибка выгрузки модели
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   schemas:
     Session:
@@ -263,6 +392,11 @@ components:
           type: string
           description: Рабочая директория
           example: /home/user/project
+        security_mode:
+          type: string
+          enum: [default, ask, auto]
+          description: Режим безопасности агента
+          example: default
         status:
           type: string
           enum: [idle, running, stopped, error]
@@ -378,3 +512,57 @@ components:
           example: stop
       required:
         - finish_reason
+
+    PromptHistoryItem:
+      type: object
+      description: Элемент истории отправленных промптов
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор записи
+          example: "p_1"
+        session_id:
+          type: string
+          description: Идентификатор сессии, в которой был отправлен промпт
+          example: "sess_abc123"
+        prompt:
+          type: string
+          description: Текст промпта
+          example: "Какой файл содержит главную функцию?"
+        created_at:
+          type: string
+          format: date-time
+          description: Время отправки промпта
+          example: "2026-11-03T15:30:00Z"
+      required:
+        - id
+        - prompt
+        - created_at
+
+    AppSettings:
+      type: object
+      description: Настройки приложения
+      properties:
+        last_model:
+          type: string
+          description: Последняя выбранная пользователем модель
+          example: "qwen3.5:4b"
+        security_mode:
+          type: string
+          enum: [default, ask, auto]
+          description: Режим безопасности агента по умолчанию
+          example: "default"
+
+    UpdateAppSettingsRequest:
+      type: object
+      description: Запрос на обновление настроек приложения
+      properties:
+        last_model:
+          type: string
+          description: Последняя выбранная пользователем модель
+          example: "qwen3.5:4b"
+        security_mode:
+          type: string
+          enum: [default, ask, auto]
+          description: Режим безопасности агента
+          example: "default"

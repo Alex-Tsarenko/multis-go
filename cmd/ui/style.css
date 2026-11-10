@@ -125,7 +125,8 @@ main {
     gap: 10px;
 }
 
-.input-area textarea {
+.input-area textarea,
+.input-area input {
     flex: 1;
     padding: 12px;
     background: #2d2d2d;
@@ -135,6 +136,7 @@ main {
     resize: none;
     height: 60px;
     font-family: inherit;
+    font-size: 14px;
 }
 
 .input-area button {

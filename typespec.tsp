@@ -26,11 +26,39 @@ namespace MultisAgent {
     error: "error",
   }
 
+  enum SecurityMode {
+    default: "default",
+    ask: "ask",
+    auto: "auto",
+  }
+
+  model PromptHistoryItem {
+    id: string;
+    session_id?: string;
+    prompt: string;
+    created_at: utcDateTime;
+  }
+
+  model AppSettings {
+    last_model?: string;
+    security_mode?: SecurityMode;
+  }
+
+  model UpdateAppSettingsRequest {
+    last_model?: string;
+    security_mode?: SecurityMode;
+  }
+
+  model UnloadModelRequest {
+    model: string;
+  }
+
   model Session {
     id: string;
     model: string;
     max_steps: int32;
     workspace: string;
+    security_mode?: SecurityMode;
     status: SessionStatus;
     created_at: utcDateTime;
   }
@@ -40,6 +68,7 @@ namespace MultisAgent {
     @minValue(1)
     max_steps?: int32 = 50;
     workspace: string;
+    security_mode?: SecurityMode = SecurityMode.default;
   }
 
   model SendMessageRequest {
@@ -158,6 +187,49 @@ namespace MultisAgent {
     @body status: { status: "stopped" };
   } | {
     @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  };
+
+  @route("/prompts/history")
+  @get
+  op getPromptHistory(@query limit?: int32 = 50): {
+    @statusCode statusCode: 200;
+    @body history: PromptHistoryItem[];
+  };
+
+  @route("/prompts/history")
+  @delete
+  op clearPromptHistory(): {
+    @statusCode statusCode: 204;
+  };
+
+  @route("/settings")
+  @get
+  op getSettings(): {
+    @statusCode statusCode: 200;
+    @body settings: AppSettings;
+  };
+
+  @route("/settings")
+  @put
+  op updateSettings(@body body: UpdateAppSettingsRequest): {
+    @statusCode statusCode: 200;
+    @body settings: AppSettings;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+
+  @route("/models/unload")
+  @post
+  op unloadModel(@body body: UnloadModelRequest): {
+    @statusCode statusCode: 200;
+    @body status: { status: "unloaded", model: string };
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 500;
     @body error: ErrorResponse;
   };
 

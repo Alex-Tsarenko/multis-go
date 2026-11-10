@@ -29,6 +29,45 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 	}
 }
 
+// UnloadModel выгружает указанную модель Ollama из памяти (GPU/RAM)
+func (c *OllamaClient) UnloadModel(ctx context.Context, modelName string) error {
+	if modelName == "" {
+		modelName = c.model
+	}
+	if modelName == "" {
+		return fmt.Errorf("model name is required")
+	}
+
+	requestBody := map[string]any{
+		"model":      modelName,
+		"keep_alive": 0,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/generate", bytes.NewReader(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to call ollama: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ollama unload error (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // StreamCompletion выполняет стриминговый запрос к Ollama API
 func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
