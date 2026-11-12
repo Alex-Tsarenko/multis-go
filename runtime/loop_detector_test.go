@@ -88,4 +88,3 @@ func TestAgent_TerminatesOnLoopDetected(t *testing.T) {
 		t.Errorf("expected finish_reason 'loop_detected' in stream")
 	}
 }
-

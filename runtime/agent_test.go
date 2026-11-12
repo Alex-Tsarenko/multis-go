@@ -64,7 +64,7 @@ type mockAIClient struct {
 	index int
 }
 
-func (m *mockAIClient) StreamCompletion(ctx context.Context, messages []runtime.Message, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
+func (m *mockAIClient) StreamCompletion(ctx context.Context, messages []runtime.Message, tools []runtime.ToolSchema, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
 	m.calls = append(m.calls, messages...)
 	if m.index >= len(m.steps) {
 		return &runtime.StreamResponse{FinishReason: "stop"}, nil
@@ -154,4 +154,3 @@ func TestContextManager_TruncatesOutput(t *testing.T) {
 		t.Errorf("missing truncation suffix")
 	}
 }
-

@@ -8,25 +8,35 @@ import (
 
 // Message сообщение в диалоге агента
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string
+	Content    string
+	ToolCalls  []ToolCall // вызовы инструментов ассистента (role=assistant)
+	ToolCallID string     // ID вызова инструмента для role=tool (OpenAI-совместимые API)
+	ToolName   string     // имя инструмента для role=tool (Ollama)
 }
 
 // ToolCall вызов инструмента моделью
 type ToolCall struct {
-	ID        string         `json:"id"`
-	Name      string         `json:"name"`
-	Arguments map[string]any `json:"arguments"`
+	ID        string
+	Name      string
+	Arguments map[string]any
+}
+
+// ToolSchema описание инструмента для function calling (JSON Schema параметров)
+type ToolSchema struct {
+	Name        string
+	Description string
+	Parameters  map[string]any
 }
 
 // StreamResponse ответ от стриминга модели
 type StreamResponse struct {
 	FinishReason string
+	Content      string
 	ToolCalls    []ToolCall
 }
 
 // AIClient интерфейс взаимодействия с LLM, определяемый потребителем (Runtime)
 type AIClient interface {
-	StreamCompletion(ctx context.Context, messages []Message, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
+	StreamCompletion(ctx context.Context, messages []Message, tools []ToolSchema, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
 }
-

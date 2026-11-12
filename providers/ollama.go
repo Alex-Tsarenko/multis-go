@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"multis-go/models"
+	"net/http"
 )
 
 // OllamaClient реализация AIClient для Ollama API
@@ -105,12 +105,52 @@ func (c *OllamaClient) UnloadModel(ctx context.Context, modelName string) error 
 	return nil
 }
 
+// ollamaToolCall вызов инструмента в формате Ollama API
+type ollamaToolCall struct {
+	Function struct {
+		Name      string         `json:"name"`
+		Arguments map[string]any `json:"arguments"`
+	} `json:"function"`
+}
+
+// ollamaMessage сообщение в формате Ollama API
+type ollamaMessage struct {
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
+	ToolName  string           `json:"tool_name,omitempty"`
+}
+
+// toOllamaMessages конвертирует сообщения runtime в формат Ollama API
+func toOllamaMessages(messages []Message) []ollamaMessage {
+	result := make([]ollamaMessage, 0, len(messages))
+	for _, m := range messages {
+		msg := ollamaMessage{Role: m.Role, Content: m.Content}
+		if m.Role == "assistant" && len(m.ToolCalls) > 0 {
+			for _, tc := range m.ToolCalls {
+				var call ollamaToolCall
+				call.Function.Name = tc.Name
+				call.Function.Arguments = tc.Arguments
+				msg.ToolCalls = append(msg.ToolCalls, call)
+			}
+		}
+		if m.Role == "tool" {
+			msg.ToolName = m.ToolName
+		}
+		result = append(result, msg)
+	}
+	return result
+}
+
 // StreamCompletion выполняет стриминговый запрос к Ollama API
-func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message, tools []ToolSchema, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
-		"messages": messages,
+		"messages": toOllamaMessages(messages),
 		"stream":   true,
+	}
+	if len(tools) > 0 {
+		requestBody["tools"] = toFunctionTools(tools)
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -143,6 +183,7 @@ func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message,
 	}
 
 	response := &StreamResponse{}
+	seenToolCalls := make(map[string]bool)
 	scanner := bufio.NewScanner(resp.Body)
 
 	lineCount := 0
@@ -157,11 +198,13 @@ func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message,
 
 		var chunk struct {
 			Message struct {
-				Role     string `json:"role"`
-				Content  string `json:"content"`
-				Thinking string `json:"thinking"`
+				Role      string           `json:"role"`
+				Content   string           `json:"content"`
+				Thinking  string           `json:"thinking"`
+				ToolCalls []ollamaToolCall `json:"tool_calls"`
 			} `json:"message"`
-			Done bool `json:"done"`
+			Done       bool   `json:"done"`
+			DoneReason string `json:"done_reason"`
 		}
 
 		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
@@ -169,7 +212,7 @@ func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message,
 			continue
 		}
 
-		log.Printf("[Ollama] Parsed chunk: role=%s, content=%q, thinking=%q, done=%v", chunk.Message.Role, chunk.Message.Content, chunk.Message.Thinking, chunk.Done)
+		log.Printf("[Ollama] Parsed chunk: role=%s, content=%q, thinking=%q, tool_calls=%d, done=%v", chunk.Message.Role, chunk.Message.Content, chunk.Message.Thinking, len(chunk.Message.ToolCalls), chunk.Done)
 
 		if chunk.Message.Thinking != "" {
 			eventChan <- models.SSEEvent{
@@ -179,14 +222,41 @@ func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message,
 		}
 
 		if chunk.Message.Content != "" {
+			response.Content += chunk.Message.Content
 			eventChan <- models.SSEEvent{
 				Type: models.EventTypeMessage,
 				Data: models.MessageData{Content: chunk.Message.Content},
 			}
 		}
 
+		for _, tc := range chunk.Message.ToolCalls {
+			argsKey, _ := json.Marshal(tc.Function.Arguments)
+			dedupeKey := tc.Function.Name + string(argsKey)
+			if seenToolCalls[dedupeKey] {
+				continue
+			}
+			seenToolCalls[dedupeKey] = true
+
+			toolCall := ToolCall{
+				Name:      tc.Function.Name,
+				Arguments: tc.Function.Arguments,
+			}
+			response.ToolCalls = append(response.ToolCalls, toolCall)
+
+			eventChan <- models.SSEEvent{
+				Type: models.EventTypeToolCall,
+				Data: models.ToolCallData{
+					Name:      toolCall.Name,
+					Arguments: toolCall.Arguments,
+				},
+			}
+		}
+
 		if chunk.Done {
-			response.FinishReason = "stop"
+			response.FinishReason = chunk.DoneReason
+			if response.FinishReason == "" {
+				response.FinishReason = "stop"
+			}
 		}
 	}
 

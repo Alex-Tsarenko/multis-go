@@ -9,8 +9,8 @@ const defaultMaxConsecutiveRepeats = 3
 
 // LoopDetector отслеживает зацикливание вызовов инструментов агентом
 type LoopDetector struct {
-	maxRepeats      int
-	lastActionKey   string
+	maxRepeats       int
+	lastActionKey    string
 	consecutiveCount int
 }
 
@@ -51,4 +51,3 @@ func (ld *LoopDetector) buildActionKey(toolName string, args map[string]any) str
 	}
 	return fmt.Sprintf("%s:%s", toolName, string(rawArgs))
 }
-

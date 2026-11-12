@@ -39,16 +39,19 @@ func (cm *ContextManager) AddToolResult(toolID, toolName, output string, err err
 	}
 
 	cm.messages = append(cm.messages, Message{
-		Role:    "tool",
-		Content: content,
+		Role:       "tool",
+		Content:    content,
+		ToolCallID: toolID,
+		ToolName:   toolName,
 	})
 }
 
 // AddAssistantMessage добавляет ответ ассистента в историю
-func (cm *ContextManager) AddAssistantMessage(content string) {
+func (cm *ContextManager) AddAssistantMessage(content string, toolCalls []ToolCall) {
 	cm.messages = append(cm.messages, Message{
-		Role:    "assistant",
-		Content: content,
+		Role:      "assistant",
+		Content:   content,
+		ToolCalls: toolCalls,
 	})
 }
 

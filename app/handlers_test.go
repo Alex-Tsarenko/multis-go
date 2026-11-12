@@ -17,10 +17,12 @@ import (
 
 type dummyFS struct{}
 
-func (d *dummyFS) Read(ctx context.Context, path string) ([]byte, error)        { return []byte("ok"), nil }
-func (d *dummyFS) Write(ctx context.Context, path string, data []byte) error    { return nil }
-func (d *dummyFS) Exists(ctx context.Context, path string) (bool, error)        { return true, nil }
-func (d *dummyFS) List(ctx context.Context, path string) ([]string, error)      { return []string{"file"}, nil }
+func (d *dummyFS) Read(ctx context.Context, path string) ([]byte, error)     { return []byte("ok"), nil }
+func (d *dummyFS) Write(ctx context.Context, path string, data []byte) error { return nil }
+func (d *dummyFS) Exists(ctx context.Context, path string) (bool, error)     { return true, nil }
+func (d *dummyFS) List(ctx context.Context, path string) ([]string, error) {
+	return []string{"file"}, nil
+}
 func (d *dummyFS) Metadata(ctx context.Context, path string) (os.FileInfo, error) { return nil, nil }
 
 type dummyCE struct{}
@@ -31,7 +33,7 @@ func (d *dummyCE) Execute(ctx context.Context, command string, args []string, ti
 
 type dummyAI struct{}
 
-func (d *dummyAI) StreamCompletion(ctx context.Context, messages []runtime.Message, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
+func (d *dummyAI) StreamCompletion(ctx context.Context, messages []runtime.Message, tools []runtime.ToolSchema, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
 	return &runtime.StreamResponse{FinishReason: "stop"}, nil
 }
 

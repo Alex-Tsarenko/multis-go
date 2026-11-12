@@ -13,6 +13,7 @@ import (
 type Tool struct {
 	Name        string
 	Description string
+	Parameters  map[string]any
 	Execute     func(ctx context.Context, args map[string]any) (string, error)
 }
 
@@ -22,6 +23,7 @@ type Agent struct {
 	commandExecutor sandbox.CommandExecutor
 	aiClient        AIClient
 	tools           map[string]Tool
+	toolSchemas     []ToolSchema
 	maxSteps        int
 	loopDetector    *LoopDetector
 }
@@ -47,25 +49,63 @@ func NewAgent(
 
 // registerTools регистрирует доступные инструменты
 func (a *Agent) registerTools() {
+	pathParam := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"path": map[string]any{
+				"type":        "string",
+				"description": "Path to the file, relative to the workspace",
+			},
+		},
+		"required": []string{"path"},
+	}
+
 	a.tools["read_file"] = Tool{
 		Name:        "read_file",
 		Description: "Read the contents of a file",
+		Parameters:  pathParam,
 		Execute:     a.toolReadFile,
 	}
 	a.tools["write_file"] = Tool{
 		Name:        "write_file",
 		Description: "Write content to a file",
-		Execute:     a.toolWriteFile,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":    map[string]any{"type": "string", "description": "Path to the file, relative to the workspace"},
+				"content": map[string]any{"type": "string", "description": "Content to write to the file"},
+			},
+			"required": []string{"path", "content"},
+		},
+		Execute: a.toolWriteFile,
 	}
 	a.tools["list_directory"] = Tool{
 		Name:        "list_directory",
 		Description: "List files in a directory",
+		Parameters:  pathParam,
 		Execute:     a.toolListDirectory,
 	}
 	a.tools["execute_command"] = Tool{
 		Name:        "execute_command",
 		Description: "Execute a shell command",
-		Execute:     a.toolExecuteCommand,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"command": map[string]any{"type": "string", "description": "Command to execute"},
+				"args":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Command arguments"},
+			},
+			"required": []string{"command"},
+		},
+		Execute: a.toolExecuteCommand,
+	}
+
+	for _, name := range []string{"read_file", "write_file", "list_directory", "execute_command"} {
+		t := a.tools[name]
+		a.toolSchemas = append(a.toolSchemas, ToolSchema{
+			Name:        t.Name,
+			Description: t.Description,
+			Parameters:  t.Parameters,
+		})
 	}
 }
 
@@ -90,7 +130,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 		messages := manager.GetMessages()
 		log.Printf("[Agent] Sending %d messages to AI", len(messages))
 
-		response, err := a.aiClient.StreamCompletion(ctx, messages, eventChan)
+		response, err := a.aiClient.StreamCompletion(ctx, messages, a.toolSchemas, eventChan)
 		if err != nil {
 			log.Printf("[Agent] AI completion error: %v", err)
 			eventChan <- models.SSEEvent{
@@ -102,13 +142,8 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 
 		log.Printf("[Agent] Response finish_reason: %s, tool_calls: %d", response.FinishReason, len(response.ToolCalls))
 
-		if response.FinishReason == "stop" {
-			eventChan <- models.SSEEvent{
-				Type: models.EventTypeDone,
-				Data: models.DoneData{FinishReason: string(models.FinishReasonStop)},
-			}
-			log.Printf("[Agent] Agent finished normally")
-			return nil
+		if response.Content != "" || len(response.ToolCalls) > 0 {
+			manager.AddAssistantMessage(response.Content, response.ToolCalls)
 		}
 
 		if len(response.ToolCalls) > 0 {
@@ -137,6 +172,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 						Type: models.EventTypeError,
 						Data: models.ErrorData{Message: fmt.Sprintf("unknown tool: %s", toolCall.Name)},
 					}
+					manager.AddToolResult(toolCall.ID, toolCall.Name, "", fmt.Errorf("unknown tool: %s", toolCall.Name))
 					continue
 				}
 
@@ -160,6 +196,16 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 
 				manager.AddToolResult(toolCall.ID, toolCall.Name, output, err)
 			}
+			continue
+		}
+
+		if response.FinishReason == "stop" || response.FinishReason == "" {
+			eventChan <- models.SSEEvent{
+				Type: models.EventTypeDone,
+				Data: models.DoneData{FinishReason: string(models.FinishReasonStop)},
+			}
+			log.Printf("[Agent] Agent finished normally")
+			return nil
 		}
 	}
 
