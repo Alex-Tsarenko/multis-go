@@ -157,6 +157,14 @@ main {
     cursor: not-allowed;
 }
 
+.input-area button.stop {
+    background: #d73a49;
+}
+
+.input-area button.stop:hover:not(:disabled) {
+    background: #b02a38;
+}
+
 #stop {
     background: #d73a49;
 }

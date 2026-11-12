@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,6 +49,15 @@ func NewHandler(fs sandbox.FileSystem, ce sandbox.CommandExecutor, client provid
 		settings: models.AppSettings{
 			SecurityMode: models.SecurityModeDefault,
 		},
+	}
+}
+
+// SetDefaultModel устанавливает модель по умолчанию
+func (h *Handler) SetDefaultModel(model string) {
+	h.settingsMutex.Lock()
+	defer h.settingsMutex.Unlock()
+	if h.settings.LastModel == "" {
+		h.settings.LastModel = model
 	}
 }
 
@@ -96,6 +106,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		Workspace:    req.Workspace,
 		SecurityMode: secMode,
 		Status:       models.StatusIdle,
+		Messages:     make([]models.SessionMessage, 0),
 		CreatedAt:    time.Now(),
 	}
 
@@ -196,6 +207,11 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state.Session.Status = models.StatusRunning
+	state.Session.Messages = append(state.Session.Messages, models.SessionMessage{
+		Role:    "user",
+		Content: req.Content,
+		Time:    time.Now(),
+	})
 	h.sessionsMutex.Unlock()
 
 	go h.runAgent(sessionID, req.Content)
@@ -308,8 +324,14 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 	agent := runtime.NewAgent(fs, ce, h.aiClient, state.Session.MaxSteps)
 
 	eventChan := make(chan models.SSEEvent, 100)
+	var assistantReply strings.Builder
 	go func() {
 		for event := range eventChan {
+			if event.Type == models.EventTypeMessage {
+				if msgData, ok := event.Data.(models.MessageData); ok {
+					assistantReply.WriteString(msgData.Content)
+				}
+			}
 			h.broadcastEvent(sessionID, event)
 		}
 	}()
@@ -324,6 +346,13 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 
 	h.sessionsMutex.Lock()
 	state.Session.Status = models.StatusIdle
+	if reply := assistantReply.String(); reply != "" {
+		state.Session.Messages = append(state.Session.Messages, models.SessionMessage{
+			Role:    "assistant",
+			Content: reply,
+			Time:    time.Now(),
+		})
+	}
 	h.sessionsMutex.Unlock()
 
 	close(eventChan)

@@ -5,8 +5,7 @@ let isRunning = false;
 const statusEl = document.getElementById('status');
 const chatEl = document.getElementById('chat');
 const messageEl = document.getElementById('message');
-const sendBtn = document.getElementById('send');
-const stopBtn = document.getElementById('stop');
+const actionBtn = document.getElementById('actionBtn');
 const createSessionBtn = document.getElementById('createSession');
 const modelSelect = document.getElementById('model');
 const workspaceInput = document.getElementById('workspace');
@@ -14,14 +13,36 @@ const securityModeSelect = document.getElementById('securityMode');
 const historyList = document.getElementById('history-list');
 
 document.getElementById('createSession').addEventListener('click', createSession);
-document.getElementById('send').addEventListener('click', sendMessage);
-document.getElementById('stop').addEventListener('click', stopSession);
+actionBtn.addEventListener('click', handleActionClick);
 document.getElementById('message').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendMessage();
+        if (!isRunning) {
+            sendMessage();
+        }
     }
 });
+
+function handleActionClick() {
+    if (isRunning) {
+        stopSession();
+    } else {
+        sendMessage();
+    }
+}
+
+function setRunningState(running) {
+    isRunning = running;
+    if (running) {
+        actionBtn.textContent = 'Stop';
+        actionBtn.className = 'stop';
+        actionBtn.disabled = false;
+    } else {
+        actionBtn.textContent = 'Send';
+        actionBtn.className = '';
+        actionBtn.disabled = false;
+    }
+}
 
 // Загрузка настроек и истории промптов при старте
 initApp();
@@ -29,6 +50,44 @@ initApp();
 async function initApp() {
     await loadSettings();
     await loadPromptHistory();
+    await restoreSession();
+}
+
+async function restoreSession() {
+    const savedSessionId = localStorage.getItem('multis_session_id');
+    if (!savedSessionId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/session/${savedSessionId}`);
+        if (response.ok) {
+            const session = await response.json();
+            currentSessionId = session.id;
+            chatEl.innerHTML = '';
+            appendMessage('system', `Session restored: ${session.id} (security: ${session.security_mode || 'default'})`);
+            if (session.messages && Array.isArray(session.messages)) {
+                session.messages.forEach((msg) => {
+                    appendMessage(msg.role, msg.content);
+                });
+            }
+            if (session.model) {
+                modelSelect.value = session.model;
+            }
+            if (session.workspace) {
+                workspaceInput.value = session.workspace;
+            }
+            if (session.security_mode && securityModeSelect) {
+                securityModeSelect.value = session.security_mode;
+            }
+            connectStream();
+            updateStatus('Session ready');
+        } else {
+            localStorage.removeItem('multis_session_id');
+        }
+    } catch (e) {
+        console.error('Failed to restore session:', e);
+    }
 }
 
 async function loadSettings() {
@@ -113,6 +172,7 @@ async function createSession() {
 
         const session = await response.json();
         currentSessionId = session.id;
+        localStorage.setItem('multis_session_id', session.id);
         chatEl.innerHTML = '';
         appendMessage('system', `Session created: ${session.id} (security: ${session.security_mode || securityMode})`);
         connectStream();
@@ -124,20 +184,21 @@ async function createSession() {
 }
 
 async function sendMessage() {
-    if (!currentSessionId) {
-        appendMessage('error', 'Please create a session first by clicking "New Session"');
-        return;
-    }
     if (isRunning) return;
 
     const content = messageEl.value.trim();
     if (!content) return;
 
+    if (!currentSessionId) {
+        await createSession();
+        if (!currentSessionId) {
+            return;
+        }
+    }
+
     appendMessage('user', content);
     messageEl.value = '';
-    isRunning = true;
-    sendBtn.disabled = true;
-    stopBtn.disabled = false;
+    setRunningState(true);
     updateStatus('Running...');
 
     try {
@@ -155,9 +216,7 @@ async function sendMessage() {
         loadPromptHistory();
     } catch (error) {
         appendMessage('error', error.message);
-        isRunning = false;
-        sendBtn.disabled = false;
-        stopBtn.disabled = true;
+        setRunningState(false);
         updateStatus('Error');
     }
 }
@@ -167,6 +226,7 @@ async function stopSession() {
 
     try {
         await fetch(`/session/${currentSessionId}/stop`, { method: 'POST' });
+        setRunningState(false);
         updateStatus('Stopped');
     } catch (error) {
         appendMessage('error', error.message);
@@ -184,7 +244,7 @@ function connectStream() {
 
     eventSource.addEventListener('reasoning', (e) => {
         const data = JSON.parse(e.data);
-        appendMessage('reasoning', data.content);
+        appendMessage('reasoning', data.content, true);
     });
 
     eventSource.addEventListener('message', (e) => {
@@ -209,10 +269,9 @@ function connectStream() {
 
     eventSource.addEventListener('done', (e) => {
         const data = JSON.parse(e.data);
-        isRunning = false;
-        sendBtn.disabled = false;
-        stopBtn.disabled = true;
-        currentMessageEl = null;
+        setRunningState(false);
+        currentAssistantEl = null;
+        currentReasoningEl = null;
         updateStatus('Done: ' + data.finish_reason);
     });
 
@@ -221,18 +280,29 @@ function connectStream() {
     };
 }
 
-let currentMessageEl = null;
+let currentAssistantEl = null;
+let currentReasoningEl = null;
 
 function appendMessage(role, content, append = false) {
     if (role === 'assistant') {
-        if (!currentMessageEl || !append) {
-            currentMessageEl = document.createElement('div');
-            currentMessageEl.className = 'message assistant';
-            chatEl.appendChild(currentMessageEl);
+        currentReasoningEl = null;
+        if (!currentAssistantEl || !append) {
+            currentAssistantEl = document.createElement('div');
+            currentAssistantEl.className = 'message assistant';
+            chatEl.appendChild(currentAssistantEl);
         }
-        currentMessageEl.textContent += content;
+        currentAssistantEl.textContent += content;
+    } else if (role === 'reasoning') {
+        currentAssistantEl = null;
+        if (!currentReasoningEl || !append) {
+            currentReasoningEl = document.createElement('div');
+            currentReasoningEl.className = 'message reasoning';
+            chatEl.appendChild(currentReasoningEl);
+        }
+        currentReasoningEl.textContent += content;
     } else {
-        currentMessageEl = null;
+        currentAssistantEl = null;
+        currentReasoningEl = null;
         const messageEl = document.createElement('div');
         messageEl.className = `message ${role}`;
         messageEl.textContent = content;

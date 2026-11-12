@@ -53,6 +53,7 @@ func main() {
 	}
 
 	handler := app.NewHandler(fileSystem, ce, client)
+	handler.SetDefaultModel(*model)
 
 	server := app.NewServer(":" + *port)
 	server.RegisterRoutes(handler)

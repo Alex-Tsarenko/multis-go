@@ -53,6 +53,12 @@ namespace MultisAgent {
     model: string;
   }
 
+  model SessionMessage {
+    role: string;
+    content: string;
+    time: utcDateTime;
+  }
+
   model Session {
     id: string;
     model: string;
@@ -60,6 +66,7 @@ namespace MultisAgent {
     workspace: string;
     security_mode?: SecurityMode;
     status: SessionStatus;
+    messages?: SessionMessage[];
     created_at: utcDateTime;
   }
 
