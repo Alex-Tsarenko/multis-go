@@ -463,6 +463,28 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(current)
 }
 
+// ListModels возвращает список доступных моделей
+func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[UserAction] GET /models from %s", r.RemoteAddr)
+
+	var modelsList []string
+	if lister, ok := h.aiClient.(providers.ModelLister); ok {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		list, err := lister.ListModels(ctx)
+		if err != nil {
+			log.Printf("[Handler] Failed to list models from provider: %v", err)
+		} else {
+			modelsList = list
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"models": modelsList,
+	})
+}
+
 // UnloadModel выгружает модель из памяти
 func (h *Handler) UnloadModel(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[UserAction] POST /models/unload from %s", r.RemoteAddr)

@@ -29,6 +29,43 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 	}
 }
 
+// ListModels возвращает список установленных моделей в Ollama
+func (c *OllamaClient) ListModels(ctx context.Context) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/tags", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Ollama API error: %s", string(body))
+	}
+
+	var data struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(data.Models))
+	for _, m := range data.Models {
+		if m.Name != "" {
+			names = append(names, m.Name)
+		}
+	}
+	return names, nil
+}
+
 // UnloadModel выгружает указанную модель Ollama из памяти (GPU/RAM)
 func (c *OllamaClient) UnloadModel(ctx context.Context, modelName string) error {
 	if modelName == "" {

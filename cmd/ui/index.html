@@ -11,14 +11,7 @@
         <header>
             <h1>Multis.Agent</h1>
             <div class="controls">
-                <input type="text" id="model" placeholder="Model (e.g., qwen3.5:4b)" list="model-list" />
-                <datalist id="model-list">
-                    <option value="deepseek-chat">deepseek-chat</option>
-                    <option value="deepseek-reasoner">deepseek-reasoner</option>
-                    <option value="llama3.2">llama3.2</option>
-                    <option value="qwen2.5">qwen2.5</option>
-                    <option value="qwen3.5:4b">qwen3.5:4b</option>
-                </datalist>
+                <select id="model" title="Select Model"></select>
                 <input type="text" id="workspace" placeholder="Workspace" value="." />
                 <select id="securityMode" title="Security Mode">
                     <option value="default">Security: default</option>

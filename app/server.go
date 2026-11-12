@@ -37,6 +37,7 @@ func (s *Server) RegisterRoutes(handler *Handler) {
 	s.mux.HandleFunc("DELETE /prompts/history", handler.ClearPromptHistory)
 	s.mux.HandleFunc("GET /settings", handler.GetSettings)
 	s.mux.HandleFunc("PUT /settings", handler.UpdateSettings)
+	s.mux.HandleFunc("GET /models", handler.ListModels)
 	s.mux.HandleFunc("POST /models/unload", handler.UnloadModel)
 }
 

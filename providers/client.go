@@ -21,6 +21,11 @@ type AIClient interface {
 	StreamCompletion(ctx context.Context, messages []Message, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
 }
 
+// ModelLister опциональный интерфейс для провайдеров, умеющих возвращать список доступных моделей
+type ModelLister interface {
+	ListModels(ctx context.Context) ([]string, error)
+}
+
 // ModelUnloader опциональный интерфейс для провайдеров, умеющих выгружать модели из памяти (например, Ollama)
 type ModelUnloader interface {
 	UnloadModel(ctx context.Context, modelName string) error

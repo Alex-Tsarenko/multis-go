@@ -227,6 +227,13 @@ namespace MultisAgent {
     @body error: ErrorResponse;
   };
 
+  @route("/models")
+  @get
+  op listModels(): {
+    @statusCode statusCode: 200;
+    @body response: { models: string[] };
+  };
+
   @route("/models/unload")
   @post
   op unloadModel(@body body: UnloadModelRequest): {

@@ -48,9 +48,34 @@ function setRunningState(running) {
 initApp();
 
 async function initApp() {
+    await loadAvailableModels();
     await loadSettings();
     await loadPromptHistory();
     await restoreSession();
+}
+
+async function loadAvailableModels() {
+    try {
+        const res = await fetch('/models');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.models && Array.isArray(data.models) && data.models.length > 0) {
+                const currentVal = modelSelect.value;
+                modelSelect.innerHTML = '';
+                data.models.forEach((name) => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    modelSelect.appendChild(opt);
+                });
+                if (currentVal && data.models.includes(currentVal)) {
+                    modelSelect.value = currentVal;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load available models:', e);
+    }
 }
 
 async function restoreSession() {
