@@ -207,6 +207,10 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state.Session.Status = models.StatusRunning
+	if req.Model != "" && req.Model != state.Session.Model {
+		state.Session.Model = req.Model
+		h.handleOllamaModelSwitch(r.Context(), req.Model)
+	}
 	state.Session.Messages = append(state.Session.Messages, models.SessionMessage{
 		Role:    "user",
 		Content: req.Content,
@@ -321,7 +325,16 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 	}
 
 	ce := sandbox.NewSafeCommandExecutor(state.Session.Workspace)
-	agent := runtime.NewAgent(fs, ce, h.aiClient, state.Session.MaxSteps)
+
+	// Выбранная в сессии модель имеет приоритет над моделью клиента по умолчанию
+	client := h.aiClient
+	if state.Session.Model != "" {
+		if configurable, ok := client.(providers.ModelConfigurable); ok {
+			client = configurable.WithModel(state.Session.Model)
+		}
+	}
+
+	agent := runtime.NewAgent(fs, ce, client, state.Session.MaxSteps)
 
 	eventChan := make(chan models.SSEEvent, 100)
 	var assistantReply strings.Builder

@@ -29,6 +29,13 @@ func NewDeepSeekClient(apiKey, model string) *DeepSeekClient {
 	}
 }
 
+// WithModel возвращает копию клиента, привязанную к указанной модели
+func (c *DeepSeekClient) WithModel(model string) AIClient {
+	clone := *c
+	clone.model = model
+	return &clone
+}
+
 // openAIToolCall сообщение ассистента с вызовами инструментов (формат OpenAI API)
 type openAIToolCall struct {
 	ID       string `json:"id"`

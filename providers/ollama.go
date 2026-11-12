@@ -29,6 +29,13 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 	}
 }
 
+// WithModel возвращает копию клиента, привязанную к указанной модели
+func (c *OllamaClient) WithModel(model string) AIClient {
+	clone := *c
+	clone.model = model
+	return &clone
+}
+
 // ListModels возвращает список установленных моделей в Ollama
 func (c *OllamaClient) ListModels(ctx context.Context) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/tags", nil)

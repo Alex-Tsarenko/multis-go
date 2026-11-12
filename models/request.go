@@ -13,6 +13,7 @@ type CreateSessionRequest struct {
 // SendMessageRequest запрос на отправку сообщения
 type SendMessageRequest struct {
 	Content string `json:"content"`
+	Model   string `json:"model,omitempty"`
 }
 
 // ErrorResponse ответ с ошибкой

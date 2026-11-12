@@ -21,7 +21,13 @@ func NewContextManager(client AIClient) *ContextManager {
 // Initialize инициализирует контекст с пользовательским сообщением
 func (cm *ContextManager) Initialize(sessionID, userMessage string) []Message {
 	cm.messages = []Message{
-		{Role: "system", Content: "You are a helpful AI assistant with access to file system and command execution tools."},
+		{Role: "system", Content: `You are a helpful AI assistant with access to file system and command execution tools.
+
+Rules:
+- Use tools only when they are needed to complete the user's request.
+- Never create or modify files unless the user explicitly asks for it.
+- Do not explore the workspace unless the task requires it.
+- If the request can be answered directly, answer without using tools.`},
 		{Role: "user", Content: userMessage},
 	}
 	return cm.messages

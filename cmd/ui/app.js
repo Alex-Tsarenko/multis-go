@@ -230,7 +230,7 @@ async function sendMessage() {
         const response = await fetch(`/session/${currentSessionId}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content })
+            body: JSON.stringify({ content, model: modelSelect.value })
         });
 
         if (!response.ok) {

@@ -87,7 +87,7 @@ func (a *Agent) registerTools() {
 	}
 	a.tools["execute_command"] = Tool{
 		Name:        "execute_command",
-		Description: "Execute a shell command",
+		Description: "Execute a shell command in the workspace (supports pipes, &&, redirects)",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -266,9 +266,22 @@ func (a *Agent) toolExecuteCommand(ctx context.Context, args map[string]any) (st
 	if !ok {
 		return "", fmt.Errorf("missing or invalid command argument")
 	}
-	cmdArgs, _ := args["args"].([]string)
-	if cmdArgs == nil {
-		cmdArgs = []string{}
-	}
+	cmdArgs := toStringSlice(args["args"])
 	return a.commandExecutor.Execute(ctx, command, cmdArgs, 30000000000)
+}
+
+// toStringSlice приводит значение аргумента к []string (JSON даёт []any)
+func toStringSlice(v any) []string {
+	result := []string{}
+	switch items := v.(type) {
+	case []string:
+		result = append(result, items...)
+	case []any:
+		for _, item := range items {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+	}
+	return result
 }

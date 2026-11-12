@@ -34,6 +34,12 @@ type ModelUnloader interface {
 	UnloadModel(ctx context.Context, modelName string) error
 }
 
+// ModelConfigurable опциональный интерфейс для провайдеров, поддерживающих
+// создание клиента с другой моделью (per-session model selection)
+type ModelConfigurable interface {
+	WithModel(model string) AIClient
+}
+
 // toFunctionTools формирует массив tools в формате function calling
 // (общий для OpenAI-совместимых API и Ollama)
 func toFunctionTools(tools []ToolSchema) []map[string]any {
