@@ -49,9 +49,9 @@ initApp();
 
 async function initApp() {
     await loadAvailableModels();
+    await restoreSession();
     await loadSettings();
     await loadPromptHistory();
-    await restoreSession();
 }
 
 async function loadAvailableModels() {
@@ -123,6 +123,9 @@ async function loadSettings() {
             if (data.last_model) {
                 modelSelect.value = data.last_model;
             }
+            if (data.last_workspace) {
+                workspaceInput.value = data.last_workspace;
+            }
             if (data.security_mode && securityModeSelect) {
                 securityModeSelect.value = data.security_mode;
             }
@@ -132,11 +135,12 @@ async function loadSettings() {
     }
 }
 
-async function saveSettings(lastModel, securityMode) {
+async function saveSettings(lastModel, securityMode, lastWorkspace) {
     try {
         const payload = {};
         if (lastModel !== undefined) payload.last_model = lastModel;
         if (securityMode !== undefined) payload.security_mode = securityMode;
+        if (lastWorkspace !== undefined) payload.last_workspace = lastWorkspace;
 
         await fetch('/settings', {
             method: 'PUT',
@@ -176,8 +180,8 @@ async function createSession() {
     const workspace = workspaceInput.value;
     const securityMode = securityModeSelect ? securityModeSelect.value : 'default';
 
-    // Сохраняем выбранную модель и режим
-    saveSettings(model, securityMode);
+    // Сохраняем выбранную модель, директорию и режим
+    saveSettings(model, securityMode, workspace);
 
     try {
         const response = await fetch('/session', {
@@ -230,7 +234,7 @@ async function sendMessage() {
         const response = await fetch(`/session/${currentSessionId}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, model: modelSelect.value })
+            body: JSON.stringify({ content, model: modelSelect.value, workspace: workspaceInput.value })
         });
 
         if (!response.ok) {
@@ -339,4 +343,73 @@ function appendMessage(role, content, append = false) {
 
 function updateStatus(text) {
     statusEl.textContent = text;
+}
+
+// Directory picker для выбора workspace
+const browseBtn = document.getElementById('browseDir');
+const dirPicker = document.getElementById('dirPicker');
+let browsePath = '.';
+
+browseBtn.addEventListener('click', () => {
+    if (dirPicker.classList.contains('hidden')) {
+        browsePath = workspaceInput.value || '.';
+        loadDirs(browsePath);
+        dirPicker.classList.remove('hidden');
+    } else {
+        dirPicker.classList.add('hidden');
+    }
+});
+
+document.addEventListener('click', (e) => {
+    if (!dirPicker.classList.contains('hidden') && !dirPicker.contains(e.target) && e.target !== browseBtn) {
+        dirPicker.classList.add('hidden');
+    }
+});
+
+async function loadDirs(path) {
+    browsePath = path;
+    try {
+        const res = await fetch('/fs/dirs?path=' + encodeURIComponent(path));
+        if (!res.ok) {
+            dirPicker.innerHTML = '<div class="dir-path">' + (await res.text()) + '</div>';
+            return;
+        }
+        const data = await res.json();
+        browsePath = data.path;
+
+        dirPicker.innerHTML = '';
+        const pathEl = document.createElement('div');
+        pathEl.className = 'dir-path';
+        pathEl.textContent = data.path;
+        dirPicker.appendChild(pathEl);
+
+        if (data.parent && data.parent !== data.path) {
+            const parentEl = document.createElement('div');
+            parentEl.className = 'dir-item';
+            parentEl.textContent = '⬅ ..';
+            parentEl.addEventListener('click', () => loadDirs(data.parent));
+            dirPicker.appendChild(parentEl);
+        }
+
+        (data.dirs || []).forEach((d) => {
+            const el = document.createElement('div');
+            el.className = 'dir-item';
+            el.textContent = '📁 ' + d.name;
+            el.title = d.path;
+            el.addEventListener('click', () => loadDirs(d.path));
+            dirPicker.appendChild(el);
+        });
+
+        const selectBtn = document.createElement('button');
+        selectBtn.className = 'dir-select';
+        selectBtn.textContent = 'Use this directory';
+        selectBtn.addEventListener('click', () => {
+            workspaceInput.value = browsePath;
+            dirPicker.classList.add('hidden');
+            saveSettings(undefined, undefined, browsePath);
+        });
+        dirPicker.appendChild(selectBtn);
+    } catch (e) {
+        dirPicker.innerHTML = '<div class="dir-path">Failed to load: ' + e.message + '</div>';
+    }
 }

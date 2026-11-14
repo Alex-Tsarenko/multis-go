@@ -39,11 +39,13 @@ func TestDeepSeek_StreamCompletion_ToolCalls(t *testing.T) {
 
 	client := &DeepSeekClient{apiKey: "test-key", model: "deepseek-chat", baseURL: server.URL}
 
-	tools := []ToolSchema{{
-		Name:        "read_file",
-		Description: "Read a file",
-		Parameters:  map[string]any{"type": "object"},
-	}}
+	tools := map[string]Tool{
+		"read_file": {
+			Name:        "read_file",
+			Description: "Read a file",
+			Parameters:  map[string]any{"type": "object"},
+		},
+	}
 
 	eventChan := make(chan models.SSEEvent, 20)
 	resp, err := client.StreamCompletion(context.Background(), []Message{{Role: "user", Content: "hi"}}, tools, eventChan)

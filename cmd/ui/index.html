@@ -12,7 +12,11 @@
             <h1>Multis.Agent</h1>
             <div class="controls">
                 <select id="model" title="Select Model"></select>
-                <input type="text" id="workspace" placeholder="Workspace" value="." />
+                <span class="workspace-picker">
+                    <input type="text" id="workspace" placeholder="Workspace" value="." />
+                    <button id="browseDir" title="Browse directories">…</button>
+                </span>
+                <div id="dirPicker" class="dir-picker hidden"></div>
                 <select id="securityMode" title="Security Mode">
                     <option value="default">Security: default</option>
                     <option value="ask">Security: ask</option>

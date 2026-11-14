@@ -69,7 +69,7 @@ func TestAgent_TerminatesOnLoopDetected(t *testing.T) {
 	agent := runtime.NewAgent(fs, ce, ai, 50)
 	eventChan := make(chan models.SSEEvent, 20)
 
-	err := agent.Run(context.Background(), "session_loop", "read file", eventChan)
+	_, err := agent.Run(context.Background(), "session_loop", nil, "read file", eventChan)
 	if err != nil {
 		t.Fatalf("unexpected agent error: %v", err)
 	}

@@ -13,15 +13,15 @@ type Message = runtime.Message
 // ToolCall псевдоним типа из runtime
 type ToolCall = runtime.ToolCall
 
-// ToolSchema псевдоним типа из runtime
-type ToolSchema = runtime.ToolSchema
+// Tool псевдоним типа из runtime
+type Tool = runtime.Tool
 
 // StreamResponse псевдоним типа из runtime
 type StreamResponse = runtime.StreamResponse
 
 // AIClient интерфейс для взаимодействия с LLM API
 type AIClient interface {
-	StreamCompletion(ctx context.Context, messages []Message, tools []ToolSchema, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
+	StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
 }
 
 // ModelLister опциональный интерфейс для провайдеров, умеющих возвращать список доступных моделей
@@ -42,7 +42,7 @@ type ModelConfigurable interface {
 
 // toFunctionTools формирует массив tools в формате function calling
 // (общий для OpenAI-совместимых API и Ollama)
-func toFunctionTools(tools []ToolSchema) []map[string]any {
+func toFunctionTools(tools map[string]Tool) []map[string]any {
 	result := make([]map[string]any, 0, len(tools))
 	for _, t := range tools {
 		result = append(result, map[string]any{

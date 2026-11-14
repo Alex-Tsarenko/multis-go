@@ -12,8 +12,9 @@ type CreateSessionRequest struct {
 
 // SendMessageRequest запрос на отправку сообщения
 type SendMessageRequest struct {
-	Content string `json:"content"`
-	Model   string `json:"model,omitempty"`
+	Content   string `json:"content"`
+	Model     string `json:"model,omitempty"`
+	Workspace string `json:"workspace,omitempty"`
 }
 
 // ErrorResponse ответ с ошибкой
@@ -32,14 +33,16 @@ type PromptHistoryItem struct {
 
 // AppSettings настройки приложения
 type AppSettings struct {
-	LastModel    string       `json:"last_model,omitempty"`
-	SecurityMode SecurityMode `json:"security_mode,omitempty"`
+	LastModel     string       `json:"last_model,omitempty"`
+	LastWorkspace string       `json:"last_workspace,omitempty"`
+	SecurityMode  SecurityMode `json:"security_mode,omitempty"`
 }
 
 // UpdateAppSettingsRequest запрос на обновление настроек
 type UpdateAppSettingsRequest struct {
-	LastModel    *string       `json:"last_model,omitempty"`
-	SecurityMode *SecurityMode `json:"security_mode,omitempty"`
+	LastModel     *string       `json:"last_model,omitempty"`
+	LastWorkspace *string       `json:"last_workspace,omitempty"`
+	SecurityMode  *SecurityMode `json:"security_mode,omitempty"`
 }
 
 // UnloadModelRequest запрос на выгрузку модели

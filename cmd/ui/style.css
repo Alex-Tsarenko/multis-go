@@ -181,3 +181,67 @@ footer {
     font-size: 14px;
     color: #888;
 }
+
+.workspace-picker {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.workspace-picker input {
+    width: 220px;
+}
+
+.workspace-picker button {
+    padding: 8px 10px;
+}
+
+.dir-picker {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    width: 320px;
+    max-height: 320px;
+    overflow-y: auto;
+    background: #252526;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 8px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.dir-picker.hidden {
+    display: none;
+}
+
+.dir-picker .dir-path {
+    font-family: monospace;
+    font-size: 12px;
+    color: #888;
+    word-break: break-all;
+    margin-bottom: 6px;
+}
+
+.dir-picker .dir-item {
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.dir-picker .dir-item:hover {
+    background: #094771;
+}
+
+.dir-picker .dir-select {
+    margin-top: 8px;
+    width: 100%;
+    padding: 8px;
+    background: #007acc;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}

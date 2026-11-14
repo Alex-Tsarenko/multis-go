@@ -23,7 +23,6 @@ type Agent struct {
 	commandExecutor sandbox.CommandExecutor
 	aiClient        AIClient
 	tools           map[string]Tool
-	toolSchemas     []ToolSchema
 	maxSteps        int
 	loopDetector    *LoopDetector
 }
@@ -98,46 +97,37 @@ func (a *Agent) registerTools() {
 		},
 		Execute: a.toolExecuteCommand,
 	}
-
-	for _, name := range []string{"read_file", "write_file", "list_directory", "execute_command"} {
-		t := a.tools[name]
-		a.toolSchemas = append(a.toolSchemas, ToolSchema{
-			Name:        t.Name,
-			Description: t.Description,
-			Parameters:  t.Parameters,
-		})
-	}
 }
 
-// Run запускает ReAct-цикл агента
-func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, eventChan chan<- models.SSEEvent) error {
+// Run запускает ReAct-цикл агента и возвращает обновлённую историю сообщений
+func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, userMessage string, eventChan chan<- models.SSEEvent) ([]Message, error) {
 	log.Printf("[Agent] Starting agent for session %s", sessionID)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	manager := NewContextManager(a.aiClient)
-	manager.Initialize(sessionID, userMessage)
+	manager.Initialize(userMessage, history)
 
 	for step := 0; step < a.maxSteps; step++ {
 		log.Printf("[Agent] Step %d/%d", step+1, a.maxSteps)
 		select {
 		case <-ctx.Done():
 			log.Printf("[Agent] Context cancelled")
-			return ctx.Err()
+			return manager.GetMessages(), ctx.Err()
 		default:
 		}
 
 		messages := manager.GetMessages()
 		log.Printf("[Agent] Sending %d messages to AI", len(messages))
 
-		response, err := a.aiClient.StreamCompletion(ctx, messages, a.toolSchemas, eventChan)
+		response, err := a.aiClient.StreamCompletion(ctx, messages, a.tools, eventChan)
 		if err != nil {
 			log.Printf("[Agent] AI completion error: %v", err)
 			eventChan <- models.SSEEvent{
 				Type: models.EventTypeError,
 				Data: models.ErrorData{Message: err.Error()},
 			}
-			return err
+			return manager.GetMessages(), err
 		}
 
 		log.Printf("[Agent] Response finish_reason: %s, tool_calls: %d", response.FinishReason, len(response.ToolCalls))
@@ -162,7 +152,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 						Type: models.EventTypeDone,
 						Data: models.DoneData{FinishReason: string(models.FinishReasonLoopDetected)},
 					}
-					return nil
+					return manager.GetMessages(), nil
 				}
 
 				tool, ok := a.tools[toolCall.Name]
@@ -205,7 +195,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 				Data: models.DoneData{FinishReason: string(models.FinishReasonStop)},
 			}
 			log.Printf("[Agent] Agent finished normally")
-			return nil
+			return manager.GetMessages(), nil
 		}
 	}
 
@@ -214,7 +204,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, userMessage string, e
 		Data: models.DoneData{FinishReason: string(models.FinishReasonMaxSteps)},
 	}
 	log.Printf("[Agent] Max steps reached")
-	return nil
+	return manager.GetMessages(), nil
 }
 
 // toolReadFile реализация инструмента чтения файла

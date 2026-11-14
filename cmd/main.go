@@ -21,6 +21,7 @@ var (
 	apiKey    = flag.String("api-key", "", "DeepSeek API key")
 	model     = flag.String("model", "deepseek-chat", "Model to use")
 	ollamaURL = flag.String("ollama-url", "http://localhost:11434", "Ollama server URL")
+	numCtx    = flag.Int("num-ctx", 32768, "Ollama context window size (num_ctx)")
 	port      = flag.String("port", "8080", "Port to listen on")
 	workspace = flag.String("workspace", ".", "Workspace directory")
 )
@@ -47,7 +48,7 @@ func main() {
 		}
 		client = providers.NewDeepSeekClient(*apiKey, *model)
 	case "ollama":
-		client = providers.NewOllamaClient(*ollamaURL, *model)
+		client = providers.NewOllamaClient(*ollamaURL, *model, *numCtx)
 	default:
 		log.Fatalf("Unknown provider: %s. Use 'deepseek' or 'ollama'", *provider)
 	}

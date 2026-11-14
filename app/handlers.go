@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -36,11 +39,13 @@ type SessionState struct {
 	Session       models.Session
 	CancelFunc    context.CancelFunc
 	EventChannels map[chan<- models.SSEEvent]bool
+	History       []runtime.Message
+	RunMutex      sync.Mutex
 }
 
 // NewHandler создаёт новый Handler
 func NewHandler(fs sandbox.FileSystem, ce sandbox.CommandExecutor, client providers.AIClient) *Handler {
-	return &Handler{
+	h := &Handler{
 		sessions:      make(map[string]*SessionState),
 		fs:            fs,
 		ce:            ce,
@@ -49,6 +54,117 @@ func NewHandler(fs sandbox.FileSystem, ce sandbox.CommandExecutor, client provid
 		settings: models.AppSettings{
 			SecurityMode: models.SecurityModeDefault,
 		},
+	}
+	h.loadPersistedSettings()
+	h.loadPersistedPrompts()
+	return h
+}
+
+// promptsFilePath возвращает путь к файлу истории промптов
+func promptsFilePath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "multis-agent", "prompts.json")
+}
+
+// loadPersistedPrompts загружает историю промптов из файла пользователя
+func (h *Handler) loadPersistedPrompts() {
+	path := promptsFilePath()
+	if path == "" {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var prompts []models.PromptHistoryItem
+	if err := json.Unmarshal(data, &prompts); err != nil {
+		return
+	}
+	h.promptsMutex.Lock()
+	h.promptHistory = append(h.promptHistory, prompts...)
+	h.promptsMutex.Unlock()
+}
+
+// persistPrompts сохраняет историю промптов в файл пользователя (хранит последние 500)
+func (h *Handler) persistPrompts() {
+	path := promptsFilePath()
+	if path == "" {
+		return
+	}
+	h.promptsMutex.RLock()
+	history := h.promptHistory
+	if len(history) > 500 {
+		history = history[len(history)-500:]
+	}
+	data, err := json.Marshal(history)
+	h.promptsMutex.RUnlock()
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		log.Printf("[Handler] Failed to persist prompts: %v", err)
+	}
+}
+
+// settingsFilePath возвращает путь к файлу настроек пользователя
+func settingsFilePath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "multis-agent", "settings.json")
+}
+
+// loadPersistedSettings загружает настройки из файла пользователя
+func (h *Handler) loadPersistedSettings() {
+	path := settingsFilePath()
+	if path == "" {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var saved models.AppSettings
+	if err := json.Unmarshal(data, &saved); err != nil {
+		return
+	}
+	h.settingsMutex.Lock()
+	if saved.LastModel != "" {
+		h.settings.LastModel = saved.LastModel
+	}
+	if saved.LastWorkspace != "" {
+		h.settings.LastWorkspace = saved.LastWorkspace
+	}
+	if saved.SecurityMode != "" {
+		h.settings.SecurityMode = saved.SecurityMode
+	}
+	h.settingsMutex.Unlock()
+}
+
+// persistSettings сохраняет настройки в файл пользователя
+func (h *Handler) persistSettings() {
+	path := settingsFilePath()
+	if path == "" {
+		return
+	}
+	h.settingsMutex.RLock()
+	data, err := json.Marshal(h.settings)
+	h.settingsMutex.RUnlock()
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		log.Printf("[Handler] Failed to persist settings: %v", err)
 	}
 }
 
@@ -94,6 +210,12 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 
 		h.handleOllamaModelSwitch(r.Context(), req.Model)
 	}
+	if req.Workspace != "" {
+		h.settingsMutex.Lock()
+		h.settings.LastWorkspace = req.Workspace
+		h.settingsMutex.Unlock()
+	}
+	h.persistSettings()
 
 	sessionID := generateSessionID()
 	log.Printf("[UserAction] Created session %s (model=%s, max_steps=%d, workspace=%s, security_mode=%s)",
@@ -195,6 +317,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: time.Now(),
 		})
 		h.promptsMutex.Unlock()
+		h.persistPrompts()
 	}
 
 	h.sessionsMutex.Lock()
@@ -210,6 +333,17 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	if req.Model != "" && req.Model != state.Session.Model {
 		state.Session.Model = req.Model
 		h.handleOllamaModelSwitch(r.Context(), req.Model)
+		h.settingsMutex.Lock()
+		h.settings.LastModel = req.Model
+		h.settingsMutex.Unlock()
+		h.persistSettings()
+	}
+	if req.Workspace != "" && req.Workspace != state.Session.Workspace {
+		state.Session.Workspace = req.Workspace
+		h.settingsMutex.Lock()
+		h.settings.LastWorkspace = req.Workspace
+		h.settingsMutex.Unlock()
+		h.persistSettings()
 	}
 	state.Session.Messages = append(state.Session.Messages, models.SessionMessage{
 		Role:    "user",
@@ -312,6 +446,10 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 	state := h.sessions[sessionID]
 	h.sessionsMutex.RUnlock()
 
+	// Сериализуем запуски агента внутри сессии и сохраняем историю между сообщениями
+	state.RunMutex.Lock()
+	defer state.RunMutex.Unlock()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	state.CancelFunc = cancel
 
@@ -349,7 +487,9 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 		}
 	}()
 
-	err = agent.Run(ctx, sessionID, userMessage, eventChan)
+	history := trimHistory(state.History)
+	finalMessages, err := agent.Run(ctx, sessionID, history, userMessage, eventChan)
+	state.History = finalMessages
 	if err != nil {
 		h.broadcastEvent(sessionID, models.SSEEvent{
 			Type: models.EventTypeError,
@@ -434,6 +574,7 @@ func (h *Handler) ClearPromptHistory(w http.ResponseWriter, r *http.Request) {
 	h.promptsMutex.Lock()
 	h.promptHistory = make([]models.PromptHistoryItem, 0)
 	h.promptsMutex.Unlock()
+	h.persistPrompts()
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -466,11 +607,15 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		h.settings.LastModel = newModel
 		h.handleOllamaModelSwitch(r.Context(), newModel)
 	}
+	if req.LastWorkspace != nil {
+		h.settings.LastWorkspace = *req.LastWorkspace
+	}
 	if req.SecurityMode != nil {
 		h.settings.SecurityMode = *req.SecurityMode
 	}
 	current := h.settings
 	h.settingsMutex.Unlock()
+	h.persistSettings()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(current)
@@ -559,6 +704,64 @@ func (h *Handler) handleOllamaModelSwitch(ctx context.Context, newModel string) 
 	}
 
 	h.lastOllamaName = newModel
+}
+
+// ListDirectories возвращает список поддиректорий для выбора workspace
+func (h *Handler) ListDirectories(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		path = "."
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		h.sendError(w, http.StatusBadRequest, "invalid_path", err.Error())
+		return
+	}
+
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		h.sendError(w, http.StatusBadRequest, "read_failed", err.Error())
+		return
+	}
+
+	type dirEntry struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
+	dirs := make([]dirEntry, 0)
+	for _, e := range entries {
+		if e.IsDir() {
+			dirs = append(dirs, dirEntry{
+				Name: e.Name(),
+				Path: filepath.Join(abs, e.Name()),
+			})
+		}
+	}
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].Name < dirs[j].Name })
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"path":   abs,
+		"parent": filepath.Dir(abs),
+		"dirs":   dirs,
+	})
+}
+
+// maxHistoryMessages ограничивает длину истории, передаваемой модели
+const maxHistoryMessages = 200
+
+// trimHistory обрезает историю: сохраняет system-сообщение и последние N сообщений
+func trimHistory(history []runtime.Message) []runtime.Message {
+	if len(history) <= maxHistoryMessages {
+		return history
+	}
+	trimmed := make([]runtime.Message, 0, maxHistoryMessages)
+	if len(history) > 0 && history[0].Role == "system" {
+		trimmed = append(trimmed, history[0])
+		history = history[1:]
+	}
+	start := len(history) - (maxHistoryMessages - len(trimmed))
+	return append(trimmed, history[start:]...)
 }
 
 // generateSessionID генерирует ID сессии

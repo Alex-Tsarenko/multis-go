@@ -64,7 +64,7 @@ type mockAIClient struct {
 	index int
 }
 
-func (m *mockAIClient) StreamCompletion(ctx context.Context, messages []runtime.Message, tools []runtime.ToolSchema, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
+func (m *mockAIClient) StreamCompletion(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
 	m.calls = append(m.calls, messages...)
 	if m.index >= len(m.steps) {
 		return &runtime.StreamResponse{FinishReason: "stop"}, nil
@@ -102,7 +102,7 @@ func TestAgent_ReActLoop_WithToolCalls(t *testing.T) {
 	agent := runtime.NewAgent(fs, ce, ai, 5)
 
 	eventChan := make(chan models.SSEEvent, 20)
-	err := agent.Run(context.Background(), "test_session", "write hello.txt", eventChan)
+	_, err := agent.Run(context.Background(), "test_session", nil, "write hello.txt", eventChan)
 	if err != nil {
 		t.Fatalf("agent run failed: %v", err)
 	}
@@ -135,9 +135,50 @@ func TestAgent_ReActLoop_WithToolCalls(t *testing.T) {
 	}
 }
 
+func TestAgent_PreservesHistoryAcrossRuns(t *testing.T) {
+	fs := newMockFileSystem()
+	ce := &mockCommandExecutor{}
+
+	ai := &mockAIClient{
+		steps: []*runtime.StreamResponse{
+			{FinishReason: "stop", Content: "first answer"},
+			{FinishReason: "stop", Content: "second answer"},
+		},
+	}
+
+	agent := runtime.NewAgent(fs, ce, ai, 5)
+	eventChan := make(chan models.SSEEvent, 20)
+
+	history, err := agent.Run(context.Background(), "s", nil, "first question", eventChan)
+	if err != nil {
+		t.Fatalf("first run failed: %v", err)
+	}
+
+	// Второй запуск должен видеть историю первого
+	callsBefore := len(ai.calls)
+	_, err = agent.Run(context.Background(), "s", history, "second question", eventChan)
+	if err != nil {
+		t.Fatalf("second run failed: %v", err)
+	}
+
+	secondCallMessages := ai.calls[callsBefore:]
+	var foundFirst, foundSecond bool
+	for _, m := range secondCallMessages {
+		if m.Role == "user" && m.Content == "first question" {
+			foundFirst = true
+		}
+		if m.Role == "assistant" && m.Content == "first answer" {
+			foundSecond = true
+		}
+	}
+	if !foundFirst || !foundSecond {
+		t.Errorf("second run lost history: first_question=%v first_answer=%v", foundFirst, foundSecond)
+	}
+}
+
 func TestContextManager_TruncatesOutput(t *testing.T) {
 	cm := runtime.NewContextManager(nil)
-	cm.Initialize("sess1", "hi")
+	cm.Initialize("hi", nil)
 
 	hugeOutput := strings.Repeat("A", 12000)
 	cm.AddToolResult("call1", "tool", hugeOutput, nil)

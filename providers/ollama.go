@@ -16,16 +16,21 @@ import (
 type OllamaClient struct {
 	baseURL string
 	model   string
+	numCtx  int
 }
 
 // NewOllamaClient создаёт новый OllamaClient
-func NewOllamaClient(baseURL, model string) *OllamaClient {
+func NewOllamaClient(baseURL, model string, numCtx int) *OllamaClient {
 	if baseURL == "" {
 		baseURL = "http://localhost:11434"
+	}
+	if numCtx <= 0 {
+		numCtx = 32768
 	}
 	return &OllamaClient{
 		baseURL: baseURL,
 		model:   model,
+		numCtx:  numCtx,
 	}
 }
 
@@ -150,11 +155,14 @@ func toOllamaMessages(messages []Message) []ollamaMessage {
 }
 
 // StreamCompletion выполняет стриминговый запрос к Ollama API
-func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message, tools []ToolSchema, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
 		"messages": toOllamaMessages(messages),
 		"stream":   true,
+		"options": map[string]any{
+			"num_ctx": c.numCtx,
+		},
 	}
 	if len(tools) > 0 {
 		requestBody["tools"] = toFunctionTools(tools)

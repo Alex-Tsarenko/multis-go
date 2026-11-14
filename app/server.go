@@ -39,6 +39,7 @@ func (s *Server) RegisterRoutes(handler *Handler) {
 	s.mux.HandleFunc("PUT /settings", handler.UpdateSettings)
 	s.mux.HandleFunc("GET /models", handler.ListModels)
 	s.mux.HandleFunc("POST /models/unload", handler.UnloadModel)
+	s.mux.HandleFunc("GET /fs/dirs", handler.ListDirectories)
 }
 
 // RegisterStatic регистрирует статические файлы

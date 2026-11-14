@@ -22,13 +22,6 @@ type ToolCall struct {
 	Arguments map[string]any
 }
 
-// ToolSchema описание инструмента для function calling (JSON Schema параметров)
-type ToolSchema struct {
-	Name        string
-	Description string
-	Parameters  map[string]any
-}
-
 // StreamResponse ответ от стриминга модели
 type StreamResponse struct {
 	FinishReason string
@@ -38,5 +31,5 @@ type StreamResponse struct {
 
 // AIClient интерфейс взаимодействия с LLM, определяемый потребителем (Runtime)
 type AIClient interface {
-	StreamCompletion(ctx context.Context, messages []Message, tools []ToolSchema, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
+	StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
 }

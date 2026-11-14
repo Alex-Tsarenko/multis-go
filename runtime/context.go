@@ -18,18 +18,23 @@ func NewContextManager(client AIClient) *ContextManager {
 	}
 }
 
-// Initialize инициализирует контекст с пользовательским сообщением
-func (cm *ContextManager) Initialize(sessionID, userMessage string) []Message {
-	cm.messages = []Message{
-		{Role: "system", Content: `You are a helpful AI assistant with access to file system and command execution tools.
+const systemPrompt = `You are a helpful AI assistant with access to file system and command execution tools.
 
 Rules:
 - Use tools only when they are needed to complete the user's request.
 - Never create or modify files unless the user explicitly asks for it.
 - Do not explore the workspace unless the task requires it.
-- If the request can be answered directly, answer without using tools.`},
-		{Role: "user", Content: userMessage},
+- If the request can be answered directly, answer without using tools.`
+
+// Initialize инициализирует контекст: сохраняет переданную историю
+// и добавляет новое сообщение пользователя
+func (cm *ContextManager) Initialize(userMessage string, history []Message) []Message {
+	if len(history) > 0 {
+		cm.messages = append([]Message{}, history...)
+	} else {
+		cm.messages = []Message{{Role: "system", Content: systemPrompt}}
 	}
+	cm.messages = append(cm.messages, Message{Role: "user", Content: userMessage})
 	return cm.messages
 }
 
