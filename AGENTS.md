@@ -14,19 +14,18 @@
 
 ## Запуск сервера и работа агента
 
-- **КРИТИЧЕСКИ ВАЖНО ДЛЯ ИИ-АССИСТЕНТА**: Команду запуска сервера (`go run cmd/main.go ...`) ВСЕГДА запускать строго с параметром `BypassSandbox: true` и `IsDaemon: true`. Запуск в стандартной песочнице запрещён — он блокирует сетевые вызовы к Ollama (`localhost:11434`) и DeepSeek API с ошибкой `connect: operation not permitted`.
+- **КРИТИЧЕСКИ ВАЖНО ДЛЯ ИИ-АССИСТЕНТА**: Команду запуска сервера (`go run cmd/main.go ...`) ВСЕГДА запускать строго с параметром `BypassSandbox: true` и `IsDaemon: true`. Запуск в стандартной песочнице запрещён — он блокирует сетевые вызовы к Ollama (`localhost:11434`) и API провайдеров с ошибкой `connect: operation not permitted`.
 - Перед повторным запуском обязательно завершать (`kill`) предыдущую запущенную задачу сервера, чтобы избежать конфликтов портов и зависших процессов.
 - **Автоперезапуск**: После любых изменений в коде (бэкенд или файлы UI `cmd/ui/*`, так как они встраиваются через `//go:embed`) ИИ-ассистент обязан самостоятельно перезапустить сервер без напоминаний от пользователя.
 
 ```bash
-# С провайдером Ollama (требует работающего сервиса Ollama на localhost:11434):
-go run cmd/main.go -provider ollama -model qwen3.5:4b
+# Конфигурация провайдеров, ключи и модели загружаются из .providers автоматически:
+go run cmd/main.go
 
-# С провайдером DeepSeek:
-DEEPSEEK_API_KEY="your-key" go run cmd/main.go -provider deepseek -model deepseek-chat
-
-# С провайдером OpenRouter:
-OPENROUTER_API_KEY="your-key" go run cmd/main.go -provider openrouter -model openai/gpt-4o-mini
+# Опциональные флаги:
+# -port <port> (по умолчанию 8080)
+# -workspace <dir> (по умолчанию .)
+# -config <path> (путь к кастомному файлу .providers)
 ```
 
 Web UI доступен по адресу: `http://localhost:8080`.

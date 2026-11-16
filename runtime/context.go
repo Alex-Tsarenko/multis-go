@@ -4,15 +4,15 @@ const (
 	maxOutputLength = 10000
 )
 
-// ContextManager управляет контекстом и историей сообщений
-type ContextManager struct {
+// PromptExecutionContext управляет контекстом и историей сообщений при обработке промпта
+type PromptExecutionContext struct {
 	client   AIClient
 	messages []Message
 }
 
-// NewContextManager создаёт новый ContextManager
-func NewContextManager(client AIClient) *ContextManager {
-	return &ContextManager{
+// NewPromptExecutionContext создаёт новый PromptExecutionContext
+func NewPromptExecutionContext(client AIClient) *PromptExecutionContext {
+	return &PromptExecutionContext{
 		client:   client,
 		messages: make([]Message, 0),
 	}
@@ -28,7 +28,7 @@ Rules:
 
 // Initialize инициализирует контекст: сохраняет переданную историю
 // и добавляет новое сообщение пользователя
-func (cm *ContextManager) Initialize(userMessage string, history []Message) []Message {
+func (cm *PromptExecutionContext) Initialize(userMessage string, history []Message) []Message {
 	if len(history) > 0 {
 		cm.messages = append([]Message{}, history...)
 	} else {
@@ -39,7 +39,7 @@ func (cm *ContextManager) Initialize(userMessage string, history []Message) []Me
 }
 
 // AddToolResult добавляет результат выполнения инструмента в историю
-func (cm *ContextManager) AddToolResult(toolID, toolName, output string, err error) {
+func (cm *PromptExecutionContext) AddToolResult(toolID, toolName, output string, err error) {
 	content := output
 	if err != nil {
 		content = "Error: " + err.Error()
@@ -58,7 +58,7 @@ func (cm *ContextManager) AddToolResult(toolID, toolName, output string, err err
 }
 
 // AddAssistantMessage добавляет ответ ассистента в историю
-func (cm *ContextManager) AddAssistantMessage(content string, toolCalls []ToolCall) {
+func (cm *PromptExecutionContext) AddAssistantMessage(content string, toolCalls []ToolCall) {
 	cm.messages = append(cm.messages, Message{
 		Role:      "assistant",
 		Content:   content,
@@ -67,6 +67,6 @@ func (cm *ContextManager) AddAssistantMessage(content string, toolCalls []ToolCa
 }
 
 // GetMessages возвращает текущую историю сообщений
-func (cm *ContextManager) GetMessages() []Message {
+func (cm *PromptExecutionContext) GetMessages() []Message {
 	return cm.messages
 }

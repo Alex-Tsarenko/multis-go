@@ -21,7 +21,7 @@ type StreamResponse = runtime.StreamResponse
 
 // AIClient интерфейс для взаимодействия с LLM API
 type AIClient interface {
-	StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
+	StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
 }
 
 // ModelLister опциональный интерфейс для провайдеров, умеющих возвращать список доступных моделей

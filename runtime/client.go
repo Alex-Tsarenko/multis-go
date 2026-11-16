@@ -31,5 +31,5 @@ type StreamResponse struct {
 
 // AIClient интерфейс взаимодействия с LLM, определяемый потребителем (Runtime)
 type AIClient interface {
-	StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
+	StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
 }

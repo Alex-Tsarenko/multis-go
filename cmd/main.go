@@ -10,29 +10,19 @@ import (
 	"multis-go/providers"
 	"multis-go/sandbox"
 	"net/http"
-	"os"
 )
 
 //go:embed ui
 var uiFS embed.FS
 
 var (
-	provider  = flag.String("provider", "deepseek", "AI provider: deepseek, ollama or openrouter")
-	apiKey    = flag.String("api-key", "", "DeepSeek or OpenRouter API key")
-	model     = flag.String("model", "deepseek-chat", "Model to use")
-	ollamaURL = flag.String("ollama-url", "http://localhost:11434", "Ollama server URL")
-	numCtx    = flag.Int("num-ctx", 32768, "Ollama context window size (num_ctx)")
-	oRouterURL = flag.String("openrouter-url", "https://openrouter.ai/api/v1", "OpenRouter API base URL")
 	port      = flag.String("port", "8080", "Port to listen on")
 	workspace = flag.String("workspace", ".", "Workspace directory")
+	config    = flag.String("config", "", "Path to .providers config file")
 )
 
 func main() {
 	flag.Parse()
-
-	if *apiKey == "" {
-		*apiKey = os.Getenv("DEEPSEEK_API_KEY")
-	}
 
 	fileSystem, err := sandbox.NewSafeFileSystem(*workspace)
 	if err != nil {
@@ -41,11 +31,21 @@ func main() {
 
 	ce := sandbox.NewSafeCommandExecutor(*workspace)
 
-	providersCfg := providers.FindProvidersConfig(*workspace)
-	client := providers.NewMultiProviderClient(providersCfg, *provider, *model, *apiKey, *ollamaURL, *numCtx, *oRouterURL)
+	var providersCfg *providers.ProvidersConfig
+	if *config != "" {
+		cfg, err := providers.LoadProvidersConfig(*config)
+		if err != nil {
+			log.Fatalf("Failed to load providers config %s: %v", *config, err)
+		}
+		providersCfg = cfg
+	} else {
+		providersCfg = providers.FindProvidersConfig(*workspace)
+	}
+
+	client := providers.NewMultiProviderClient(providersCfg, "", "", "", "", 0, "")
 
 	handler := app.NewHandler(fileSystem, ce, client)
-	handler.SetDefaultModel(*model)
+	handler.SetDefaultModel(client.DefaultModel())
 
 	server := app.NewServer(":" + *port)
 	server.RegisterRoutes(handler)
@@ -55,7 +55,7 @@ func main() {
 
 	fmt.Printf("Starting Multis.Agent on http://localhost:%s\n", *port)
 	fmt.Printf("Workspace: %s\n", *workspace)
-	fmt.Printf("Model: %s\n", *model)
+	fmt.Printf("Default Model: %s\n", client.DefaultModel())
 
 	if err := server.Start(); err != nil {
 		log.Fatalf("Server error: %v", err)

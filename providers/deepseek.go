@@ -107,8 +107,8 @@ type accumulatedToolCall struct {
 	arguments strings.Builder
 }
 
-// StreamCompletion выполняет стриминговый запрос к DeepSeek API
-func (c *DeepSeekClient) StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+// StreamLLMResponse выполняет стриминговый запрос к DeepSeek API
+func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
 		"messages": toOpenAIMessages(messages),

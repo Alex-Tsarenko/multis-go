@@ -48,22 +48,17 @@ func NewAgent(
 
 // registerTools регистрирует доступные инструменты
 func (a *Agent) registerTools() {
-	pathParam := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "Path to the file, relative to the workspace",
-			},
-		},
-		"required": []string{"path"},
-	}
-
 	a.tools["read_file"] = Tool{
 		Name:        "read_file",
 		Description: "Read the contents of a file",
-		Parameters:  pathParam,
-		Execute:     a.toolReadFile,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{"type": "string", "description": "Path to the file, relative to the workspace"},
+			},
+			"required": []string{"path"},
+		},
+		Execute: a.toolReadFile,
 	}
 	a.tools["write_file"] = Tool{
 		Name:        "write_file",
@@ -81,8 +76,14 @@ func (a *Agent) registerTools() {
 	a.tools["list_directory"] = Tool{
 		Name:        "list_directory",
 		Description: "List files in a directory",
-		Parameters:  pathParam,
-		Execute:     a.toolListDirectory,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{"type": "string", "description": "Path to the directory, relative to the workspace"},
+			},
+			"required": []string{"path"},
+		},
+		Execute: a.toolListDirectory,
 	}
 	a.tools["execute_command"] = Tool{
 		Name:        "execute_command",
@@ -105,35 +106,35 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	manager := NewContextManager(a.aiClient)
-	manager.Initialize(userMessage, history)
+	promptCtx := NewPromptExecutionContext(a.aiClient)
+	promptCtx.Initialize(userMessage, history)
 
 	for step := 0; step < a.maxSteps; step++ {
 		log.Printf("[Agent] Step %d/%d", step+1, a.maxSteps)
 		select {
 		case <-ctx.Done():
-			log.Printf("[Agent] Context cancelled")
-			return manager.GetMessages(), ctx.Err()
+			log.Printf("[Agent] Prompt run cancelled by user in session %s at step %d/%d: %v", sessionID, step+1, a.maxSteps, ctx.Err())
+			return promptCtx.GetMessages(), ctx.Err()
 		default:
 		}
 
-		messages := manager.GetMessages()
+		messages := promptCtx.GetMessages()
 		log.Printf("[Agent] Sending %d messages to AI", len(messages))
 
-		response, err := a.aiClient.StreamCompletion(ctx, messages, a.tools, eventChan)
+		response, err := a.aiClient.StreamLLMResponse(ctx, messages, a.tools, eventChan)
 		if err != nil {
 			log.Printf("[Agent] AI completion error: %v", err)
 			eventChan <- models.SSEEvent{
 				Type: models.EventTypeError,
 				Data: models.ErrorData{Message: err.Error()},
 			}
-			return manager.GetMessages(), err
+			return promptCtx.GetMessages(), err
 		}
 
 		log.Printf("[Agent] Response finish_reason: %s, tool_calls: %d", response.FinishReason, len(response.ToolCalls))
 
 		if response.Content != "" || len(response.ToolCalls) > 0 {
-			manager.AddAssistantMessage(response.Content, response.ToolCalls)
+			promptCtx.AddAssistantMessage(response.Content, response.ToolCalls)
 		}
 
 		if len(response.ToolCalls) > 0 {
@@ -152,7 +153,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 						Type: models.EventTypeDone,
 						Data: models.DoneData{FinishReason: string(models.FinishReasonLoopDetected)},
 					}
-					return manager.GetMessages(), nil
+					return promptCtx.GetMessages(), nil
 				}
 
 				tool, ok := a.tools[toolCall.Name]
@@ -162,7 +163,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 						Type: models.EventTypeError,
 						Data: models.ErrorData{Message: fmt.Sprintf("unknown tool: %s", toolCall.Name)},
 					}
-					manager.AddToolResult(toolCall.ID, toolCall.Name, "", fmt.Errorf("unknown tool: %s", toolCall.Name))
+					promptCtx.AddToolResult(toolCall.ID, toolCall.Name, "", fmt.Errorf("unknown tool: %s", toolCall.Name))
 					continue
 				}
 
@@ -184,7 +185,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 					},
 				}
 
-				manager.AddToolResult(toolCall.ID, toolCall.Name, output, err)
+				promptCtx.AddToolResult(toolCall.ID, toolCall.Name, output, err)
 			}
 			continue
 		}
@@ -195,7 +196,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 				Data: models.DoneData{FinishReason: string(models.FinishReasonStop)},
 			}
 			log.Printf("[Agent] Agent finished normally")
-			return manager.GetMessages(), nil
+			return promptCtx.GetMessages(), nil
 		}
 	}
 
@@ -204,7 +205,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 		Data: models.DoneData{FinishReason: string(models.FinishReasonMaxSteps)},
 	}
 	log.Printf("[Agent] Max steps reached")
-	return manager.GetMessages(), nil
+	return promptCtx.GetMessages(), nil
 }
 
 // toolReadFile реализация инструмента чтения файла

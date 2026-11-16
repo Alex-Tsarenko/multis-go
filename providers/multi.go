@@ -17,8 +17,23 @@ type MultiProviderClient struct {
 	modelToClient   map[string]AIClient
 }
 
+// DefaultModel возвращает модель по умолчанию
+func (mp *MultiProviderClient) DefaultModel() string {
+	return mp.defaultModel
+}
+
 // NewMultiProviderClient инициализирует клиентов на основе .providers конфигурации и параметров флагов
 func NewMultiProviderClient(cfg *ProvidersConfig, defaultProvider, defaultModel, defaultAPIKey, defaultOllamaURL string, defaultNumCtx int, defaultORouterURL string) *MultiProviderClient {
+	if defaultOllamaURL == "" {
+		defaultOllamaURL = "http://localhost:11434"
+	}
+	if defaultNumCtx <= 0 {
+		defaultNumCtx = 32768
+	}
+	if defaultORouterURL == "" {
+		defaultORouterURL = "https://openrouter.ai/api/v1"
+	}
+
 	mp := &MultiProviderClient{
 		defaultProvider: defaultProvider,
 		defaultModel:    defaultModel,
@@ -80,29 +95,48 @@ func NewMultiProviderClient(cfg *ProvidersConfig, defaultProvider, defaultModel,
 				mp.clients[nameLower] = client
 				for _, m := range pCfg.Models {
 					mp.modelToClient[m] = client
+					if mp.defaultModel == "" {
+						mp.defaultModel = m
+					}
 				}
 			}
 		}
 	}
 
-	// 2. Гарантируем, что провайдер по умолчанию из командной строки инициализирован
-	if _, ok := mp.clients[defaultProvider]; !ok {
-		switch defaultProvider {
-		case "deepseek":
-			key := defaultAPIKey
-			if key == "" {
-				key = os.Getenv("DEEPSEEK_API_KEY")
+	// Если defaultProvider не задан или не найден, выбираем первого доступного
+	if mp.defaultProvider == "" || mp.clients[mp.defaultProvider] == nil {
+		for _, name := range []string{"openrouter", "ollama", "deepseek"} {
+			if _, ok := mp.clients[name]; ok {
+				mp.defaultProvider = name
+				break
 			}
-			mp.clients["deepseek"] = NewDeepSeekClient(key, defaultModel)
-		case "ollama":
-			mp.clients["ollama"] = NewOllamaClient(defaultOllamaURL, defaultModel, defaultNumCtx)
-		case "openrouter":
-			key := defaultAPIKey
-			if key == "" {
-				key = os.Getenv("OPENROUTER_API_KEY")
-			}
-			mp.clients["openrouter"] = NewOpenRouterClient(key, defaultModel, defaultORouterURL)
 		}
+	}
+
+	// 2. Гарантируем, что провайдер по умолчанию из командной строки инициализирован, если был явно указан
+	if mp.defaultProvider != "" {
+		if _, ok := mp.clients[mp.defaultProvider]; !ok {
+			switch mp.defaultProvider {
+			case "deepseek":
+				key := defaultAPIKey
+				if key == "" {
+					key = os.Getenv("DEEPSEEK_API_KEY")
+				}
+				mp.clients["deepseek"] = NewDeepSeekClient(key, defaultModel)
+			case "ollama":
+				mp.clients["ollama"] = NewOllamaClient(defaultOllamaURL, defaultModel, defaultNumCtx)
+			case "openrouter":
+				key := defaultAPIKey
+				if key == "" {
+					key = os.Getenv("OPENROUTER_API_KEY")
+				}
+				mp.clients["openrouter"] = NewOpenRouterClient(key, defaultModel, defaultORouterURL)
+			}
+		}
+	}
+
+	if mp.defaultModel == "" {
+		mp.defaultModel = "deepseek-chat"
 	}
 
 	return mp

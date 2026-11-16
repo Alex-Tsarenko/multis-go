@@ -64,7 +64,7 @@ type mockAIClient struct {
 	index int
 }
 
-func (m *mockAIClient) StreamCompletion(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
+func (m *mockAIClient) StreamLLMResponse(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
 	m.calls = append(m.calls, messages...)
 	if m.index >= len(m.steps) {
 		return &runtime.StreamResponse{FinishReason: "stop"}, nil
@@ -176,8 +176,8 @@ func TestAgent_PreservesHistoryAcrossRuns(t *testing.T) {
 	}
 }
 
-func TestContextManager_TruncatesOutput(t *testing.T) {
-	cm := runtime.NewContextManager(nil)
+func TestPromptExecutionContext_TruncatesOutput(t *testing.T) {
+	cm := runtime.NewPromptExecutionContext(nil)
 	cm.Initialize("hi", nil)
 
 	hugeOutput := strings.Repeat("A", 12000)
