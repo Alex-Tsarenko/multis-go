@@ -1,0 +1,22 @@
+providers:
+  deepseek:
+    api_key: "${DEEPSEEK_API_KEY}"
+    base_url: "https://api.deepseek.com/v1"
+    models:
+      - "deepseek-chat"
+      - "deepseek-reasoner"
+
+  ollama:
+    base_url: "http://localhost:11434"
+    num_ctx: 32768
+    models:
+      - "qwen2.5-coder:7b"
+      - "llama3.1:8b"
+
+  openrouter:
+    api_key: "${OPENROUTER_API_KEY}"
+    base_url: "https://openrouter.ai/api/v1"
+    models:
+      - "openai/gpt-4o-mini"
+      - "anthropic/claude-3.5-sonnet"
+      - "deepseek/deepseek-chat"
