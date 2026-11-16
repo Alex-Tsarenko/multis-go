@@ -17,11 +17,12 @@ import (
 var uiFS embed.FS
 
 var (
-	provider  = flag.String("provider", "deepseek", "AI provider: deepseek or ollama")
-	apiKey    = flag.String("api-key", "", "DeepSeek API key")
+	provider  = flag.String("provider", "deepseek", "AI provider: deepseek, ollama or openrouter")
+	apiKey    = flag.String("api-key", "", "DeepSeek or OpenRouter API key")
 	model     = flag.String("model", "deepseek-chat", "Model to use")
 	ollamaURL = flag.String("ollama-url", "http://localhost:11434", "Ollama server URL")
 	numCtx    = flag.Int("num-ctx", 32768, "Ollama context window size (num_ctx)")
+	oRouterURL = flag.String("openrouter-url", "https://openrouter.ai/api/v1", "OpenRouter API base URL")
 	port      = flag.String("port", "8080", "Port to listen on")
 	workspace = flag.String("workspace", ".", "Workspace directory")
 )
@@ -49,8 +50,17 @@ func main() {
 		client = providers.NewDeepSeekClient(*apiKey, *model)
 	case "ollama":
 		client = providers.NewOllamaClient(*ollamaURL, *model, *numCtx)
+	case "openrouter":
+		if *apiKey == "" {
+			*apiKey = os.Getenv("OPENROUTER_API_KEY")
+		}
+		if *apiKey == "" {
+			log.Fatal("API key is required for OpenRouter. Provide it via -api-key flag or OPENROUTER_API_KEY environment variable")
+		}
+		c := providers.NewOpenRouterClient(*apiKey, *model, *oRouterURL)
+		client = c
 	default:
-		log.Fatalf("Unknown provider: %s. Use 'deepseek' or 'ollama'", *provider)
+		log.Fatalf("Unknown provider: %s. Use 'deepseek', 'ollama' or 'openrouter'", *provider)
 	}
 
 	handler := app.NewHandler(fileSystem, ce, client)

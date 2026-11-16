@@ -24,6 +24,9 @@ go run cmd/main.go -provider ollama -model qwen3.5:4b
 
 # С провайдером DeepSeek:
 DEEPSEEK_API_KEY="your-key" go run cmd/main.go -provider deepseek -model deepseek-chat
+
+# С провайдером OpenRouter:
+OPENROUTER_API_KEY="your-key" go run cmd/main.go -provider openrouter -model openai/gpt-4o-mini
 ```
 
 Web UI доступен по адресу: `http://localhost:8080`.
