@@ -41,27 +41,8 @@ func main() {
 
 	ce := sandbox.NewSafeCommandExecutor(*workspace)
 
-	var client providers.AIClient
-	switch *provider {
-	case "deepseek":
-		if *apiKey == "" {
-			log.Fatal("API key is required for DeepSeek. Provide it via -api-key flag or DEEPSEEK_API_KEY environment variable")
-		}
-		client = providers.NewDeepSeekClient(*apiKey, *model)
-	case "ollama":
-		client = providers.NewOllamaClient(*ollamaURL, *model, *numCtx)
-	case "openrouter":
-		if *apiKey == "" {
-			*apiKey = os.Getenv("OPENROUTER_API_KEY")
-		}
-		if *apiKey == "" {
-			log.Fatal("API key is required for OpenRouter. Provide it via -api-key flag or OPENROUTER_API_KEY environment variable")
-		}
-		c := providers.NewOpenRouterClient(*apiKey, *model, *oRouterURL)
-		client = c
-	default:
-		log.Fatalf("Unknown provider: %s. Use 'deepseek', 'ollama' or 'openrouter'", *provider)
-	}
+	providersCfg := providers.FindProvidersConfig(*workspace)
+	client := providers.NewMultiProviderClient(providersCfg, *provider, *model, *apiKey, *ollamaURL, *numCtx, *oRouterURL)
 
 	handler := app.NewHandler(fileSystem, ce, client)
 	handler.SetDefaultModel(*model)

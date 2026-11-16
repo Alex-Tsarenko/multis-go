@@ -80,3 +80,15 @@ func TestDeepSeek_StreamCompletion_ToolCalls(t *testing.T) {
 		t.Errorf("expected tool name read_file, got %v", toolFn["name"])
 	}
 }
+
+func TestDeepSeek_ListModels(t *testing.T) {
+	client := NewDeepSeekClient("test-key", "deepseek-chat")
+	models, err := client.ListModels(context.Background())
+	if err != nil {
+		t.Fatalf("ListModels failed: %v", err)
+	}
+	if len(models) == 0 {
+		t.Fatal("expected at least 1 model")
+	}
+}
+

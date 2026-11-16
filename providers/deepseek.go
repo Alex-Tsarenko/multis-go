@@ -15,9 +15,10 @@ import (
 
 // DeepSeekClient реализация AIClient для DeepSeek API
 type DeepSeekClient struct {
-	apiKey  string
-	model   string
-	baseURL string
+	apiKey         string
+	model          string
+	baseURL        string
+	fallbackModels []string
 }
 
 // NewDeepSeekClient создаёт новый DeepSeekClient
@@ -29,11 +30,29 @@ func NewDeepSeekClient(apiKey, model string) *DeepSeekClient {
 	}
 }
 
+// SetFallbackModels задает локальный список моделей для провайдера
+func (c *DeepSeekClient) SetFallbackModels(models []string) {
+	c.fallbackModels = models
+}
+
 // WithModel возвращает копию клиента, привязанную к указанной модели
 func (c *DeepSeekClient) WithModel(model string) AIClient {
 	clone := *c
 	clone.model = model
 	return &clone
+}
+
+// ListModels возвращает список моделей DeepSeek (из .providers или дефолтные)
+func (c *DeepSeekClient) ListModels(ctx context.Context) ([]string, error) {
+	if len(c.fallbackModels) > 0 {
+		return c.fallbackModels, nil
+	}
+	if cfg := FindProvidersConfig(""); cfg != nil {
+		if models := cfg.GetConfiguredModels("deepseek"); len(models) > 0 {
+			return models, nil
+		}
+	}
+	return []string{"deepseek-chat", "deepseek-reasoner"}, nil
 }
 
 // openAIToolCall сообщение ассистента с вызовами инструментов (формат OpenAI API)

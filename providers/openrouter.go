@@ -14,9 +14,10 @@ import (
 
 // OpenRouterClient реализация AIClient для OpenRouter API
 type OpenRouterClient struct {
-	apiKey  string
-	model   string
-	baseURL string
+	apiKey         string
+	model          string
+	baseURL        string
+	fallbackModels []string
 }
 
 // NewOpenRouterClient создаёт новый OpenRouterClient
@@ -29,6 +30,11 @@ func NewOpenRouterClient(apiKey, model, baseURL string) *OpenRouterClient {
 		model:   model,
 		baseURL: baseURL,
 	}
+}
+
+// SetFallbackModels задает локальный список моделей для провайдера
+func (c *OpenRouterClient) SetFallbackModels(models []string) {
+	c.fallbackModels = models
 }
 
 // WithModel возвращает копию клиента, привязанной к указанной модели
@@ -193,6 +199,15 @@ func (c *OpenRouterClient) StreamCompletion(ctx context.Context, messages []Mess
 
 // ListModels возвращает список доступных моделей
 func (c *OpenRouterClient) ListModels(ctx context.Context) ([]string, error) {
+	if len(c.fallbackModels) > 0 {
+		return c.fallbackModels, nil
+	}
+	if cfg := FindProvidersConfig(""); cfg != nil {
+		if models := cfg.GetConfiguredModels("openrouter"); len(models) > 0 {
+			return models, nil
+		}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/models", nil)
 	if err != nil {
 		return nil, err

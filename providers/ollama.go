@@ -14,9 +14,10 @@ import (
 
 // OllamaClient реализация AIClient для Ollama API
 type OllamaClient struct {
-	baseURL string
-	model   string
-	numCtx  int
+	baseURL         string
+	model           string
+	numCtx          int
+	configuredModels []string
 }
 
 // NewOllamaClient создаёт новый OllamaClient
@@ -34,6 +35,11 @@ func NewOllamaClient(baseURL, model string, numCtx int) *OllamaClient {
 	}
 }
 
+// SetConfiguredModels задает локальный список моделей для провайдера
+func (c *OllamaClient) SetConfiguredModels(models []string) {
+	c.configuredModels = models
+}
+
 // WithModel возвращает копию клиента, привязанную к указанной модели
 func (c *OllamaClient) WithModel(model string) AIClient {
 	clone := *c
@@ -43,20 +49,28 @@ func (c *OllamaClient) WithModel(model string) AIClient {
 
 // ListModels возвращает список установленных моделей в Ollama
 func (c *OllamaClient) ListModels(ctx context.Context) ([]string, error) {
+	if len(c.configuredModels) > 0 {
+		return c.configuredModels, nil
+	}
+	if cfg := FindProvidersConfig(""); cfg != nil {
+		if models := cfg.GetConfiguredModels("ollama"); len(models) > 0 {
+			return models, nil
+		}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/tags", nil)
 	if err != nil {
-		return nil, err
+		return c.fallbackModels(), nil
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return c.fallbackModels(), nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Ollama API error: %s", string(body))
+		return c.fallbackModels(), nil
 	}
 
 	var data struct {
@@ -66,7 +80,7 @@ func (c *OllamaClient) ListModels(ctx context.Context) ([]string, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
+		return c.fallbackModels(), nil
 	}
 
 	names := make([]string, 0, len(data.Models))
@@ -75,7 +89,22 @@ func (c *OllamaClient) ListModels(ctx context.Context) ([]string, error) {
 			names = append(names, m.Name)
 		}
 	}
+	if len(names) == 0 {
+		return c.fallbackModels(), nil
+	}
 	return names, nil
+}
+
+func (c *OllamaClient) fallbackModels() []string {
+	if len(c.configuredModels) > 0 {
+		return c.configuredModels
+	}
+	if cfg := FindProvidersConfig(""); cfg != nil {
+		if models := cfg.GetConfiguredModels("ollama"); len(models) > 0 {
+			return models
+		}
+	}
+	return nil
 }
 
 // UnloadModel выгружает указанную модель Ollama из памяти (GPU/RAM)
