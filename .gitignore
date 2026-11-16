@@ -25,3 +25,5 @@ go.work.sum
 .devin/
 
 tests/
+
+.providers
