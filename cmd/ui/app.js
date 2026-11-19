@@ -313,6 +313,16 @@ let currentAssistantEl = null;
 let currentReasoningEl = null;
 let pendingToolElements = [];
 
+const SCROLL_THRESHOLD = 50;
+
+function isNearBottom() {
+    return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < SCROLL_THRESHOLD;
+}
+
+function scrollToBottom() {
+    chatEl.scrollTop = chatEl.scrollHeight;
+}
+
 function formatToolArgs(args) {
     if (!args || Object.keys(args).length === 0) return '';
     return Object.entries(args)
@@ -326,6 +336,7 @@ function formatToolArgs(args) {
 function appendToolCall(name, args) {
     currentAssistantEl = null;
     currentReasoningEl = null;
+    const stickToBottom = isNearBottom();
 
     const details = document.createElement('details');
     details.className = 'message tool-block';
@@ -353,10 +364,11 @@ function appendToolCall(name, args) {
 
     chatEl.appendChild(details);
     pendingToolElements.push(details);
-    chatEl.scrollTop = chatEl.scrollHeight;
+    if (stickToBottom) scrollToBottom();
 }
 
 function appendToolResult(output, status) {
+    const stickToBottom = isNearBottom();
     const details = pendingToolElements.shift();
     if (details) {
         const resultDiv = details.querySelector('.tool-result-content');
@@ -368,11 +380,13 @@ function appendToolResult(output, status) {
         }
     } else {
         appendMessage('tool_result', output);
+        return;
     }
-    chatEl.scrollTop = chatEl.scrollHeight;
+    if (stickToBottom) scrollToBottom();
 }
 
 function appendMessage(role, content, append = false) {
+    const stickToBottom = role === 'user' || isNearBottom();
     if (role === 'assistant') {
         currentReasoningEl = null;
         if (!currentAssistantEl || !append) {
@@ -398,7 +412,7 @@ function appendMessage(role, content, append = false) {
         chatEl.appendChild(messageEl);
     }
 
-    chatEl.scrollTop = chatEl.scrollHeight;
+    if (stickToBottom) scrollToBottom();
 }
 
 function updateStatus(text) {
