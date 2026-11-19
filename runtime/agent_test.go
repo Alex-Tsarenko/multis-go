@@ -64,7 +64,7 @@ type mockAIClient struct {
 	index int
 }
 
-func (m *mockAIClient) StreamLLMResponse(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
+func (m *mockAIClient) StreamLLMResponse(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.ServerEvent) (*runtime.StreamResponse, error) {
 	m.calls = append(m.calls, messages...)
 	if m.index >= len(m.steps) {
 		return &runtime.StreamResponse{FinishReason: "stop"}, nil
@@ -101,7 +101,7 @@ func TestAgent_ReActLoop_WithToolCalls(t *testing.T) {
 
 	agent := runtime.NewAgent(fs, ce, ai, 5)
 
-	eventChan := make(chan models.SSEEvent, 20)
+	eventChan := make(chan models.ServerEvent, 20)
 	_, err := agent.Run(context.Background(), "test_session", nil, "write hello.txt", eventChan)
 	if err != nil {
 		t.Fatalf("agent run failed: %v", err)
@@ -147,7 +147,7 @@ func TestAgent_PreservesHistoryAcrossRuns(t *testing.T) {
 	}
 
 	agent := runtime.NewAgent(fs, ce, ai, 5)
-	eventChan := make(chan models.SSEEvent, 20)
+	eventChan := make(chan models.ServerEvent, 20)
 
 	history, err := agent.Run(context.Background(), "s", nil, "first question", eventChan)
 	if err != nil {

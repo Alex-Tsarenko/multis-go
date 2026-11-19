@@ -184,7 +184,7 @@ func toOllamaMessages(messages []Message) []ollamaMessage {
 }
 
 // StreamLLMResponse выполняет стриминговый запрос к Ollama API
-func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.ServerEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
 		"messages": toOllamaMessages(messages),
@@ -259,7 +259,7 @@ func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message
 		log.Printf("[Ollama] Parsed chunk: role=%s, content=%q, thinking=%q, tool_calls=%d, done=%v", chunk.Message.Role, chunk.Message.Content, chunk.Message.Thinking, len(chunk.Message.ToolCalls), chunk.Done)
 
 		if chunk.Message.Thinking != "" {
-			eventChan <- models.SSEEvent{
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeReasoning,
 				Data: models.ReasoningData{Content: chunk.Message.Thinking},
 			}
@@ -267,7 +267,7 @@ func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message
 
 		if chunk.Message.Content != "" {
 			response.Content += chunk.Message.Content
-			eventChan <- models.SSEEvent{
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeMessage,
 				Data: models.MessageData{Content: chunk.Message.Content},
 			}
@@ -287,7 +287,7 @@ func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message
 			}
 			response.ToolCalls = append(response.ToolCalls, toolCall)
 
-			eventChan <- models.SSEEvent{
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeToolCall,
 				Data: models.ToolCallData{
 					Name:      toolCall.Name,
@@ -297,10 +297,7 @@ func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message
 		}
 
 		if chunk.Done {
-			response.FinishReason = chunk.DoneReason
-			if response.FinishReason == "" {
-				response.FinishReason = "stop"
-			}
+			response.FinishReason = normalizeFinishReason(chunk.DoneReason)
 		}
 	}
 

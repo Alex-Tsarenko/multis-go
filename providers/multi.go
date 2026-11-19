@@ -175,7 +175,7 @@ func (mp *MultiProviderClient) clientForModel(model string) AIClient {
 }
 
 // StreamLLMResponse перенаправляет запрос клиенту выбранной модели
-func (mp *MultiProviderClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+func (mp *MultiProviderClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.ServerEvent) (*StreamResponse, error) {
 	target := mp.clientForModel(mp.defaultModel)
 	if target == nil {
 		return nil, fmt.Errorf("no AI provider available")

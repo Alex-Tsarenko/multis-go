@@ -13,13 +13,13 @@ func TestLoopDetector_DetectsConsecutiveRepeats(t *testing.T) {
 
 	args := map[string]any{"path": "main.go"}
 
-	if ld.Record("read_file", args) {
+	if ld.Check("read_file", args) {
 		t.Fatalf("unexpected loop on 1st call")
 	}
-	if ld.Record("read_file", args) {
+	if ld.Check("read_file", args) {
 		t.Fatalf("unexpected loop on 2nd call")
 	}
-	if !ld.Record("read_file", args) {
+	if !ld.Check("read_file", args) {
 		t.Fatalf("expected loop on 3rd call")
 	}
 }
@@ -30,10 +30,10 @@ func TestLoopDetector_ResetsOnDifferentAction(t *testing.T) {
 	args1 := map[string]any{"path": "main.go"}
 	args2 := map[string]any{"path": "other.go"}
 
-	ld.Record("read_file", args1)
-	ld.Record("read_file", args1)
+	ld.Check("read_file", args1)
+	ld.Check("read_file", args1)
 	// Different argument interrupts the streak
-	if ld.Record("read_file", args2) {
+	if ld.Check("read_file", args2) {
 		t.Fatalf("unexpected loop after argument change")
 	}
 }
@@ -67,7 +67,7 @@ func TestAgent_TerminatesOnLoopDetected(t *testing.T) {
 	}
 
 	agent := runtime.NewAgent(fs, ce, ai, 50)
-	eventChan := make(chan models.SSEEvent, 20)
+	eventChan := make(chan models.ServerEvent, 20)
 
 	_, err := agent.Run(context.Background(), "session_loop", nil, "read file", eventChan)
 	if err != nil {

@@ -108,7 +108,7 @@ type accumulatedToolCall struct {
 }
 
 // StreamLLMResponse выполняет стриминговый запрос к DeepSeek API
-func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.ServerEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
 		"messages": toOpenAIMessages(messages),
@@ -189,7 +189,7 @@ func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Messa
 		delta := chunk.Choices[0].Delta
 
 		if delta.Reasoning != "" {
-			eventChan <- models.SSEEvent{
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeReasoning,
 				Data: models.ReasoningData{Content: delta.Reasoning},
 			}
@@ -197,7 +197,7 @@ func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Messa
 
 		if delta.Content != "" {
 			response.Content += delta.Content
-			eventChan <- models.SSEEvent{
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeMessage,
 				Data: models.MessageData{Content: delta.Content},
 			}
@@ -218,9 +218,7 @@ func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Messa
 			call.arguments.WriteString(tc.Function.Arguments)
 		}
 
-		if chunk.Choices[0].FinishReason != "" {
-			response.FinishReason = chunk.Choices[0].FinishReason
-		}
+		response.FinishReason = normalizeFinishReason(chunk.Choices[0].FinishReason)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -247,7 +245,7 @@ func (c *DeepSeekClient) StreamLLMResponse(ctx context.Context, messages []Messa
 
 		response.ToolCalls = append(response.ToolCalls, toolCall)
 
-		eventChan <- models.SSEEvent{
+		eventChan <- models.ServerEvent{
 			Type: models.EventTypeToolCall,
 			Data: models.ToolCallData{
 				ID:        toolCall.ID,

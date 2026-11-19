@@ -101,7 +101,7 @@ func (a *Agent) registerTools() {
 }
 
 // Run запускает ReAct-цикл агента и возвращает обновлённую историю сообщений
-func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, userMessage string, eventChan chan<- models.SSEEvent) ([]Message, error) {
+func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, userMessage string, eventChan chan<- models.ServerEvent) ([]Message, error) {
 	log.Printf("[Agent] Starting agent for session %s", sessionID)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -124,7 +124,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 		response, err := a.aiClient.StreamLLMResponse(ctx, messages, a.tools, eventChan)
 		if err != nil {
 			log.Printf("[Agent] AI completion error: %v", err)
-			eventChan <- models.SSEEvent{
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeError,
 				Data: models.ErrorData{Message: err.Error()},
 			}
@@ -141,15 +141,15 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 			for _, toolCall := range response.ToolCalls {
 				log.Printf("[Agent] Tool call: %s with args %v", toolCall.Name, toolCall.Arguments)
 
-				if a.loopDetector.Record(toolCall.Name, toolCall.Arguments) {
+				if a.loopDetector.Check(toolCall.Name, toolCall.Arguments) {
 					log.Printf("[Agent] Loop detected on tool %s", toolCall.Name)
-					eventChan <- models.SSEEvent{
+					eventChan <- models.ServerEvent{
 						Type: models.EventTypeError,
 						Data: models.ErrorData{
 							Message: fmt.Sprintf("loop detected: repeated tool '%s' with identical arguments", toolCall.Name),
 						},
 					}
-					eventChan <- models.SSEEvent{
+					eventChan <- models.ServerEvent{
 						Type: models.EventTypeDone,
 						Data: models.DoneData{FinishReason: string(models.FinishReasonLoopDetected)},
 					}
@@ -159,7 +159,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 				tool, ok := a.tools[toolCall.Name]
 				if !ok {
 					log.Printf("[Agent] Unknown tool: %s", toolCall.Name)
-					eventChan <- models.SSEEvent{
+					eventChan <- models.ServerEvent{
 						Type: models.EventTypeError,
 						Data: models.ErrorData{Message: fmt.Sprintf("unknown tool: %s", toolCall.Name)},
 					}
@@ -177,7 +177,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 					log.Printf("[Agent] Tool executed successfully, output length: %d", len(output))
 				}
 
-				eventChan <- models.SSEEvent{
+				eventChan <- models.ServerEvent{
 					Type: models.EventTypeToolResult,
 					Data: models.ToolResultData{
 						Status: status,
@@ -190,8 +190,8 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 			continue
 		}
 
-		if response.FinishReason == "stop" || response.FinishReason == "" {
-			eventChan <- models.SSEEvent{
+		if response.FinishReason == FinishReasonStop {
+			eventChan <- models.ServerEvent{
 				Type: models.EventTypeDone,
 				Data: models.DoneData{FinishReason: string(models.FinishReasonStop)},
 			}
@@ -200,7 +200,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 		}
 	}
 
-	eventChan <- models.SSEEvent{
+	eventChan <- models.ServerEvent{
 		Type: models.EventTypeDone,
 		Data: models.DoneData{FinishReason: string(models.FinishReasonMaxSteps)},
 	}

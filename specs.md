@@ -9,7 +9,7 @@
   - **Server-Sent Events (SSE):** основной канал доставки данных в реальном времени (потоковые токены рассуждений reasoning-моделей, вывод основного ответа, статусы вызовов инструментов).
 
 ├── models/
-│   ├── events.go      # SSE события (SSEEvent, ReasoningData, MessageData, ToolCallData, etc.)
+│   ├── server_events.go # Server события (ServerEvent, ReasoningData, MessageData, ToolCallData, etc.)
 │   ├── session.go     # Сессии (Session, SessionStatus)
 │   └── request.go     # API запросы/ответы (CreateSessionRequest, SendMessageRequest, ErrorResponse)
 ├── runtime/

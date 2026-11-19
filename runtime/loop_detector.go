@@ -24,8 +24,8 @@ func NewLoopDetector(maxRepeats int) *LoopDetector {
 	}
 }
 
-// Record регистрирует вызов инструмента. Возвращает true, если зафиксировано зацикливание.
-func (ld *LoopDetector) Record(toolName string, args map[string]any) bool {
+// Check регистрирует вызов инструмента. Возвращает true, если зафиксировано зацикливание.
+func (ld *LoopDetector) Check(toolName string, args map[string]any) bool {
 	actionKey := ld.buildActionKey(toolName, args)
 
 	if actionKey == ld.lastActionKey {

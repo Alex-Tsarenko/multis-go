@@ -38,7 +38,7 @@ type Handler struct {
 type SessionState struct {
 	Session       models.Session
 	CancelFunc    context.CancelFunc
-	EventChannels map[chan<- models.SSEEvent]bool
+	EventChannels map[chan<- models.ServerEvent]bool
 	History       []runtime.Message
 	RunMutex      sync.Mutex
 }
@@ -235,7 +235,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	h.sessionsMutex.Lock()
 	h.sessions[sessionID] = &SessionState{
 		Session:       session,
-		EventChannels: make(map[chan<- models.SSEEvent]bool),
+		EventChannels: make(map[chan<- models.ServerEvent]bool),
 	}
 	h.sessionsMutex.Unlock()
 
@@ -384,7 +384,7 @@ func (h *Handler) StreamSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	eventChan := make(chan models.SSEEvent, 100)
+	eventChan := make(chan models.ServerEvent, 100)
 	h.sessionsMutex.Lock()
 	state.EventChannels[eventChan] = true
 	h.sessionsMutex.Unlock()
@@ -455,7 +455,7 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 
 	fs, err := sandbox.NewSafeFileSystem(state.Session.Workspace)
 	if err != nil {
-		h.broadcastEvent(sessionID, models.SSEEvent{
+		h.broadcastEvent(sessionID, models.ServerEvent{
 			Type: models.EventTypeError,
 			Data: models.ErrorData{Message: err.Error()},
 		})
@@ -474,7 +474,7 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 
 	agent := runtime.NewAgent(fs, ce, client, state.Session.MaxSteps)
 
-	eventChan := make(chan models.SSEEvent, 100)
+	eventChan := make(chan models.ServerEvent, 100)
 	var assistantReply strings.Builder
 	go func() {
 		for event := range eventChan {
@@ -491,7 +491,7 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 	finalMessages, err := agent.Run(ctx, sessionID, history, userMessage, eventChan)
 	state.History = finalMessages
 	if err != nil {
-		h.broadcastEvent(sessionID, models.SSEEvent{
+		h.broadcastEvent(sessionID, models.ServerEvent{
 			Type: models.EventTypeError,
 			Data: models.ErrorData{Message: err.Error()},
 		})
@@ -512,7 +512,7 @@ func (h *Handler) runAgent(sessionID, userMessage string) {
 }
 
 // broadcastEvent отправляет событие всем подключённым SSE клиентам
-func (h *Handler) broadcastEvent(sessionID string, event models.SSEEvent) {
+func (h *Handler) broadcastEvent(sessionID string, event models.ServerEvent) {
 	h.sessionsMutex.RLock()
 	state, ok := h.sessions[sessionID]
 	h.sessionsMutex.RUnlock()

@@ -19,9 +19,24 @@ type Tool = runtime.Tool
 // StreamResponse псевдоним типа из runtime
 type StreamResponse = runtime.StreamResponse
 
+// FinishReason псевдоним типа из runtime
+type FinishReason = runtime.FinishReason
+
+const (
+	FinishReasonStop      = runtime.FinishReasonStop
+	FinishReasonToolCalls = runtime.FinishReasonToolCalls
+	FinishReasonLength    = runtime.FinishReasonLength
+	FinishReasonUnknown   = runtime.FinishReasonUnknown
+)
+
+// normalizeFinishReason приводит finish_reason провайдера к внутреннему значению
+func normalizeFinishReason(raw string) FinishReason {
+	return runtime.NormalizeFinishReason(raw)
+}
+
 // AIClient интерфейс для взаимодействия с LLM API
 type AIClient interface {
-	StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error)
+	StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.ServerEvent) (*StreamResponse, error)
 }
 
 // ModelLister опциональный интерфейс для провайдеров, умеющих возвращать список доступных моделей

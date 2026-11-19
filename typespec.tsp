@@ -89,7 +89,7 @@ namespace MultisAgent {
 
   #region SSE Events
 
-  enum SSEEventType {
+  enum ServerEventType {
     reasoning: "reasoning",
     message: "message",
     tool_call: "tool_call",
@@ -125,8 +125,8 @@ namespace MultisAgent {
     finish_reason: FinishReason;
   }
 
-  model SSEEvent {
-    type: SSEEventType;
+  model ServerEvent {
+    type: ServerEventType;
     data: ReasoningData | MessageData | ToolCallData | ToolResultData | ErrorData | DoneData;
   }
 

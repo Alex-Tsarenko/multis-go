@@ -1,20 +1,20 @@
 package models
 
-// SSEEventTypes типы SSE событий
-type SSEEventType string
+// ServerEventTypes типы SSE событий
+type ServerEventType string
 
 const (
-	EventTypeReasoning  SSEEventType = "reasoning"
-	EventTypeMessage    SSEEventType = "message"
-	EventTypeToolCall   SSEEventType = "tool_call"
-	EventTypeToolResult SSEEventType = "tool_result"
-	EventTypeError      SSEEventType = "error"
-	EventTypeDone       SSEEventType = "done"
+	EventTypeReasoning  ServerEventType = "reasoning"
+	EventTypeMessage    ServerEventType = "message"
+	EventTypeToolCall   ServerEventType = "tool_call"
+	EventTypeToolResult ServerEventType = "tool_result"
+	EventTypeError      ServerEventType = "error"
+	EventTypeDone       ServerEventType = "done"
 )
 
-// SSEEvent базовая структура SSE события
-type SSEEvent struct {
-	Type SSEEventType `json:"type"`
+// ServerEvent базовая структура SSE события
+type ServerEvent struct {
+	Type ServerEventType `json:"type"`
 	Data interface{}  `json:"data"`
 }
 

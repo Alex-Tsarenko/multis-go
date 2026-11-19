@@ -148,7 +148,7 @@ func toGeminiTools(tools map[string]Tool) []map[string]any {
 	}
 }
 
-func (c *GeminiClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+func (c *GeminiClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.ServerEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"contents": toGeminiMessages(messages),
 	}
@@ -191,7 +191,7 @@ func (c *GeminiClient) StreamLLMResponse(ctx context.Context, messages []Message
 	}
 
 	response := &StreamResponse{
-		FinishReason: "stop",
+		FinishReason: FinishReasonStop,
 	}
 	scanner := bufio.NewScanner(resp.Body)
 
@@ -224,12 +224,12 @@ func (c *GeminiClient) StreamLLMResponse(ctx context.Context, messages []Message
 
 		for _, cand := range chunk.Candidates {
 			if cand.FinishReason != "" {
-				response.FinishReason = strings.ToLower(cand.FinishReason)
+				response.FinishReason = normalizeFinishReason(cand.FinishReason)
 			}
 			for _, part := range cand.Content.Parts {
 				if part.Text != "" {
 					response.Content += part.Text
-					eventChan <- models.SSEEvent{
+					eventChan <- models.ServerEvent{
 						Type: models.EventTypeMessage,
 						Data: models.MessageData{Content: part.Text},
 					}
@@ -241,7 +241,7 @@ func (c *GeminiClient) StreamLLMResponse(ctx context.Context, messages []Message
 						Arguments: fc.Args,
 					}
 					response.ToolCalls = append(response.ToolCalls, toolCall)
-					eventChan <- models.SSEEvent{
+					eventChan <- models.ServerEvent{
 						Type: models.EventTypeToolCall,
 						Data: models.ToolCallData{
 							Name:      toolCall.Name,
