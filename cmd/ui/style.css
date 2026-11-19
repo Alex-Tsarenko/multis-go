@@ -103,18 +103,66 @@ main {
     font-size: 0.9em;
 }
 
-.message.tool_call {
+.message.tool-block {
     background: #2d2d2d;
-    color: #4ec9b0;
+    color: #d4d4d4;
     font-family: monospace;
+    padding: 0;
+    border-left: 3px solid #4ec9b0;
 }
 
-.message.tool_result {
-    background: #2d2d2d;
+.message.tool-block summary {
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    user-select: none;
+    list-style: none;
+}
+
+.message.tool-block summary::-webkit-details-marker {
+    display: none;
+}
+
+.message.tool-block summary::before {
+    content: '▶';
+    font-size: 10px;
+    color: #888;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+
+.message.tool-block[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.message.tool-block .tool-name {
+    color: #4ec9b0;
+    font-weight: 600;
+}
+
+.message.tool-block .tool-args {
+    color: #9cdcfe;
+    font-size: 0.85em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 70%;
+}
+
+.message.tool-block .tool-result-content {
+    padding: 8px 10px;
+    border-top: 1px solid #3c3c3c;
     color: #ce9178;
-    font-family: monospace;
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.message.tool-block .tool-result-content.tool-error {
+    color: #f48771;
 }
 
 .message.error {

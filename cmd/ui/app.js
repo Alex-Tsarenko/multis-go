@@ -283,12 +283,12 @@ function connectStream() {
 
     eventSource.addEventListener('tool_call', (e) => {
         const data = JSON.parse(e.data);
-        appendMessage('tool_call', `${data.name}(${JSON.stringify(data.arguments)})`);
+        appendToolCall(data.name, data.arguments);
     });
 
     eventSource.addEventListener('tool_result', (e) => {
         const data = JSON.parse(e.data);
-        appendMessage('tool_result', data.output);
+        appendToolResult(data.output, data.status);
     });
 
     eventSource.addEventListener('error', (e) => {
@@ -311,6 +311,66 @@ function connectStream() {
 
 let currentAssistantEl = null;
 let currentReasoningEl = null;
+let pendingToolElements = [];
+
+function formatToolArgs(args) {
+    if (!args || Object.keys(args).length === 0) return '';
+    return Object.entries(args)
+        .map(([key, val]) => {
+            const v = typeof val === 'string' ? val : JSON.stringify(val);
+            return `${key}: ${v}`;
+        })
+        .join(', ');
+}
+
+function appendToolCall(name, args) {
+    currentAssistantEl = null;
+    currentReasoningEl = null;
+
+    const details = document.createElement('details');
+    details.className = 'message tool-block';
+
+    const summary = document.createElement('summary');
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'tool-name';
+    nameSpan.textContent = name;
+    summary.appendChild(nameSpan);
+
+    const argsStr = formatToolArgs(args);
+    if (argsStr) {
+        const argsSpan = document.createElement('span');
+        argsSpan.className = 'tool-args';
+        argsSpan.textContent = argsStr;
+        summary.appendChild(argsSpan);
+    }
+
+    details.appendChild(summary);
+
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'tool-result-content';
+    resultDiv.textContent = '⏳ Running...';
+    details.appendChild(resultDiv);
+
+    chatEl.appendChild(details);
+    pendingToolElements.push(details);
+    chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function appendToolResult(output, status) {
+    const details = pendingToolElements.shift();
+    if (details) {
+        const resultDiv = details.querySelector('.tool-result-content');
+        if (resultDiv) {
+            resultDiv.textContent = output || '(empty)';
+            if (status === 'error') {
+                resultDiv.classList.add('tool-error');
+            }
+        }
+    } else {
+        appendMessage('tool_result', output);
+    }
+    chatEl.scrollTop = chatEl.scrollHeight;
+}
 
 function appendMessage(role, content, append = false) {
     if (role === 'assistant') {
