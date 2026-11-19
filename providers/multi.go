@@ -89,6 +89,16 @@ func NewMultiProviderClient(cfg *ProvidersConfig, defaultProvider, defaultModel,
 				orClient := NewOpenRouterClient(apiKey, defaultModel, url)
 				orClient.SetFallbackModels(pCfg.Models)
 				client = orClient
+			case "gemini":
+				if apiKey == "" {
+					apiKey = os.Getenv("GEMINI_API_KEY")
+				}
+				if apiKey == "" && defaultProvider == "gemini" {
+					apiKey = defaultAPIKey
+				}
+				gemClient := NewGeminiClient(apiKey, defaultModel, baseURL)
+				gemClient.SetFallbackModels(pCfg.Models)
+				client = gemClient
 			}
 
 			if client != nil {
@@ -105,7 +115,7 @@ func NewMultiProviderClient(cfg *ProvidersConfig, defaultProvider, defaultModel,
 
 	// Если defaultProvider не задан или не найден, выбираем первого доступного
 	if mp.defaultProvider == "" || mp.clients[mp.defaultProvider] == nil {
-		for _, name := range []string{"openrouter", "ollama", "deepseek"} {
+		for _, name := range []string{"openrouter", "gemini", "ollama", "deepseek"} {
 			if _, ok := mp.clients[name]; ok {
 				mp.defaultProvider = name
 				break
@@ -131,6 +141,12 @@ func NewMultiProviderClient(cfg *ProvidersConfig, defaultProvider, defaultModel,
 					key = os.Getenv("OPENROUTER_API_KEY")
 				}
 				mp.clients["openrouter"] = NewOpenRouterClient(key, defaultModel, defaultORouterURL)
+			case "gemini":
+				key := defaultAPIKey
+				if key == "" {
+					key = os.Getenv("GEMINI_API_KEY")
+				}
+				mp.clients["gemini"] = NewGeminiClient(key, defaultModel, "")
 			}
 		}
 	}
@@ -158,13 +174,13 @@ func (mp *MultiProviderClient) clientForModel(model string) AIClient {
 	return nil
 }
 
-// StreamCompletion перенаправляет запрос клиенту выбранной модели
-func (mp *MultiProviderClient) StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+// StreamLLMResponse перенаправляет запрос клиенту выбранной модели
+func (mp *MultiProviderClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	target := mp.clientForModel(mp.defaultModel)
 	if target == nil {
 		return nil, fmt.Errorf("no AI provider available")
 	}
-	return target.StreamCompletion(ctx, messages, tools, eventChan)
+	return target.StreamLLMResponse(ctx, messages, tools, eventChan)
 }
 
 // WithModel возвращает копию роутера с установленной конкретной моделью
@@ -184,7 +200,7 @@ func (mp *MultiProviderClient) ListModels(ctx context.Context) ([]string, error)
 	var allModels []string
 
 	// Сначала собираем модели от всех провайдеров через ListModels
-	providerOrder := []string{"openrouter", "ollama", "deepseek"}
+	providerOrder := []string{"openrouter", "gemini", "ollama", "deepseek"}
 	for _, p := range providerOrder {
 		c, ok := mp.clients[p]
 		if !ok {

@@ -44,8 +44,8 @@ func (c *OpenRouterClient) WithModel(model string) AIClient {
 	return &clone
 }
 
-// StreamCompletion выполняет стриминговый запрос к OpenRouter API
-func (c *OpenRouterClient) StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+// StreamLLMResponse выполняет стриминговый запрос к OpenRouter API
+func (c *OpenRouterClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
 		"messages": toOpenAIMessages(messages),

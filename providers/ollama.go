@@ -183,8 +183,8 @@ func toOllamaMessages(messages []Message) []ollamaMessage {
 	return result
 }
 
-// StreamCompletion выполняет стриминговый запрос к Ollama API
-func (c *OllamaClient) StreamCompletion(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
+// StreamLLMResponse выполняет стриминговый запрос к Ollama API
+func (c *OllamaClient) StreamLLMResponse(ctx context.Context, messages []Message, tools map[string]Tool, eventChan chan<- models.SSEEvent) (*StreamResponse, error) {
 	requestBody := map[string]any{
 		"model":    c.model,
 		"messages": toOllamaMessages(messages),

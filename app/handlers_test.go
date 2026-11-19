@@ -33,7 +33,7 @@ func (d *dummyCE) Execute(ctx context.Context, command string, args []string, ti
 
 type dummyAI struct{}
 
-func (d *dummyAI) StreamCompletion(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
+func (d *dummyAI) StreamLLMResponse(ctx context.Context, messages []runtime.Message, tools map[string]runtime.Tool, eventChan chan<- models.SSEEvent) (*runtime.StreamResponse, error) {
 	return &runtime.StreamResponse{FinishReason: "stop"}, nil
 }
 

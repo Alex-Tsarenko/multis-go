@@ -57,8 +57,8 @@ func (cm *PromptExecutionContext) AddToolResult(toolID, toolName, output string,
 	})
 }
 
-// AddAssistantMessage добавляет ответ ассистента в историю
-func (cm *PromptExecutionContext) AddAssistantMessage(content string, toolCalls []ToolCall) {
+// AddLlmResponse добавляет ответ LLM в историю
+func (cm *PromptExecutionContext) AddLlmResponse(content string, toolCalls []ToolCall) {
 	cm.messages = append(cm.messages, Message{
 		Role:      "assistant",
 		Content:   content,

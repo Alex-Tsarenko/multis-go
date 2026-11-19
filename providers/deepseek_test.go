@@ -48,7 +48,7 @@ func TestDeepSeek_StreamLLMResponse_ToolCalls(t *testing.T) {
 	}
 
 	eventChan := make(chan models.SSEEvent, 20)
-	resp, err := client.StreamCompletion(context.Background(), []Message{{Role: "user", Content: "hi"}}, tools, eventChan)
+	resp, err := client.StreamLLMResponse(context.Background(), []Message{{Role: "user", Content: "hi"}}, tools, eventChan)
 	close(eventChan)
 	if err != nil {
 		t.Fatalf("StreamCompletion failed: %v", err)

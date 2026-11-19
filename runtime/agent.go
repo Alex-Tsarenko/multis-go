@@ -134,7 +134,7 @@ func (a *Agent) Run(ctx context.Context, sessionID string, history []Message, us
 		log.Printf("[Agent] Response finish_reason: %s, tool_calls: %d", response.FinishReason, len(response.ToolCalls))
 
 		if response.Content != "" || len(response.ToolCalls) > 0 {
-			promptCtx.AddAssistantMessage(response.Content, response.ToolCalls)
+			promptCtx.AddLlmResponse(response.Content, response.ToolCalls)
 		}
 
 		if len(response.ToolCalls) > 0 {

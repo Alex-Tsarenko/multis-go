@@ -41,7 +41,7 @@ func TestOpenRouter_StreamCompletion_ToolCalls(t *testing.T) {
 	}
 
 	eventChan := make(chan models.SSEEvent, 20)
-	resp, err := client.StreamCompletion(context.Background(), []Message{{Role: "user", Content: "hi"}}, tools, eventChan)
+	resp, err := client.StreamLLMResponse(context.Background(), []Message{{Role: "user", Content: "hi"}}, tools, eventChan)
 	if err != nil {
 		t.Fatalf("StreamCompletion failed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestOpenRouter_StreamCompletion_Reasoning(t *testing.T) {
 	client := &OpenRouterClient{apiKey: "test-key", model: "openai/gpt-4o-mini", baseURL: server.URL}
 
 	eventChan := make(chan models.SSEEvent, 20)
-	if _, err := client.StreamCompletion(context.Background(), []Message{{Role: "user", Content: "hi"}}, nil, eventChan); err != nil {
+	if _, err := client.StreamLLMResponse(context.Background(), []Message{{Role: "user", Content: "hi"}}, nil, eventChan); err != nil {
 		t.Fatalf("StreamCompletion failed: %v", err)
 	}
 	close(eventChan)
