@@ -24,7 +24,8 @@ Rules:
 - Use tools only when they are needed to complete the user's request.
 - Never create or modify files unless the user explicitly asks for it.
 - Do not explore the workspace unless the task requires it.
-- If the request can be answered directly, answer without using tools.`
+- If the request can be answered directly, answer without using tools.
+- Text wrapped in [quote]...[/quote] is a quote from the conversation selected by the user.`
 
 // Initialize инициализирует контекст: сохраняет переданную историю
 // и добавляет новое сообщение пользователя

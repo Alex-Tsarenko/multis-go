@@ -419,6 +419,55 @@ function updateStatus(text) {
     statusEl.textContent = text;
 }
 
+// Цитирование выделенного текста в ленте
+const quoteBtn = document.createElement('button');
+quoteBtn.className = 'quote-btn hidden';
+quoteBtn.textContent = '❝ Quote';
+document.body.appendChild(quoteBtn);
+
+function hideQuoteButton() {
+    quoteBtn.classList.add('hidden');
+}
+
+function updateQuoteButton() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+        hideQuoteButton();
+        return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!chatEl.contains(range.commonAncestorContainer)) {
+        hideQuoteButton();
+        return;
+    }
+    const rect = range.getBoundingClientRect();
+    quoteBtn.style.top = (rect.bottom + 4) + 'px';
+    quoteBtn.style.left = rect.left + 'px';
+    quoteBtn.classList.remove('hidden');
+}
+
+chatEl.addEventListener('mouseup', updateQuoteButton);
+chatEl.addEventListener('keyup', updateQuoteButton);
+chatEl.addEventListener('scroll', hideQuoteButton);
+document.addEventListener('mousedown', (e) => {
+    if (!quoteBtn.contains(e.target)) hideQuoteButton();
+});
+quoteBtn.addEventListener('mousedown', (e) => e.preventDefault());
+quoteBtn.addEventListener('click', () => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) {
+        const text = sel.toString().replace(/\s+/g, ' ').trim();
+        const start = messageEl.selectionStart ?? messageEl.value.length;
+        const end = messageEl.selectionEnd ?? messageEl.value.length;
+        const quote = '[quote] ' + text + ' [/quote] ';
+        messageEl.value = messageEl.value.slice(0, start) + quote + messageEl.value.slice(end);
+        messageEl.selectionStart = messageEl.selectionEnd = start + quote.length;
+        messageEl.focus();
+        hideQuoteButton();
+        sel.removeAllRanges();
+    }
+});
+
 // Directory picker для выбора workspace
 const browseBtn = document.getElementById('browseDir');
 const dirPicker = document.getElementById('dirPicker');

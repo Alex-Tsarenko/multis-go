@@ -259,6 +259,26 @@ footer {
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
+.quote-btn {
+    position: fixed;
+    z-index: 200;
+    padding: 4px 10px;
+    background: #007acc;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.quote-btn:hover {
+    background: #005a9e;
+}
+
+.quote-btn.hidden {
+    display: none;
+}
+
 .dir-picker.hidden {
     display: none;
 }
